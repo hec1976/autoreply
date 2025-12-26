@@ -1,70 +1,122 @@
+# Autoreply Plattform
+Zentrale Auto-Response Verwaltung für Postfix-Cluster
 
+Die **Autoreply Plattform** ist eine vollumfängliche, produktionsreife Lösung zur zentralen Verwaltung automatischer E-Mail-Antworten in Postfix-basierten Mailinfrastrukturen.
 
-# Autoreply Plattform - Zentrale Auto-Response Verwaltung für Postfix-Cluster
-
-Die **Autoreply Plattform** ist eine vollumfängliche Lösung für automatische Antworten in Postfix-basierten Mailinfrastrukturen.
-Sie kombiniert eine robuste Mailfilter-Runtime mit einer zentralen Service- und API-Ebene sowie einer webbasierten Administrationsoberfläche.
-
-Lösung für echte Probleme:
-- **Verwaltet mehrern Postfix-Server von einer Web-Oberfläche aus**
-- **Automatische Backup & Versionierung** bei jeder Änderung
-- **Sofortiges Deployment** auf alle Server mit einem Klick
-
-Ideal für:
-- Unternehmen mit **mehreren Postfix-Servern**
-- **100- 2000 Fachanwendungen** die Auto-Responses benötigen (HR, Finanzen, Support)
-- Teams die **Compliance & Änderungshistorien** benötigen
-
-Die Installation erfolgt **zentral über `install.sh`** und richtet alle benötigten Komponenten ein.
-Die Web-Konsole ist **nicht Teil von `install.sh`** und wird separat betrieben.
+Sie kombiniert eine robuste Mailfilter-Runtime mit einer zentralen Service- und API-Ebene sowie einer optionalen webbasierten Administrationsoberfläche. Der Fokus liegt auf stabilen Betriebsabläufen, klarer Trennung der Komponenten und nachvollziehbaren Änderungen.
 
 ---
 
-## Inhalte dieses Repositories
+## Zweck und Ziel
+
+Die Plattform wurde entwickelt, um Autoreply-Regeln in Umgebungen mit mehreren Postfix-Servern kontrolliert, einheitlich und revisionssicher zu betreiben.
+
+Typische Herausforderungen, die gelöst werden:
+
+- Manuelle Pflege von Autoreplies auf einzelnen Servern
+- Fehlende oder inkonsistente Backups
+- Keine saubere Änderungshistorie
+- Aufwendige Rollbacks
+- Hohe Abhängigkeit der Fachabteilungen von der IT
+
+Die Autoreply Plattform ersetzt diesen Ansatz durch eine zentrale Steuerung, ohne den Mailfluss unnötig zu verkomplizieren oder von Verwaltungsdiensten abhängig zu machen.
+
+---
+
+## Grundprinzip
+
+- Mailverarbeitung erfolgt lokal auf jedem Postfix-Server
+- Administration und Konfigurationspflege erfolgen zentral
+- Jede Änderung wird validiert, versioniert und gesichert
+- GUI und API sind nicht kritisch für den Mailfluss
+- Rollbacks sind jederzeit möglich
+
+---
+
+## Hauptfunktionen
+
+- Zentrale Verwaltung mehrerer Postfix-Server
+- Einheitliche Autoreply-Regeln für E-Mail-Adressen und Domains
+- Automatische Backups bei jeder Änderung
+- Versionierung mit Diff- und Restore-Funktion
+- Kontrolliertes Deployment auf einzelne oder alle Server
+- Trennung von Runtime und Verwaltungslogik
+- Audit- und Compliance-tauglicher Betrieb
+
+---
+
+## Zielumgebungen
+
+Geeignet für:
+
+- Unternehmen mit mehreren Postfix-Instanzen
+- Organisationen mit 100 bis 2000 Fachanwendungen
+- IT-Betrieb mit Änderungs- und Nachweispflichten
+- Umgebungen mit klarer Trennung von Betrieb und Inhalt
+
+Typische Einsatzbereiche:
+
+- HR Bewerbungsbestätigungen
+- Finanzabteilungen für Rechnungseingänge
+- Support- und Ticket-Systeme
+- Allgemeine Service- und Info-Adressen
+
+---
+
+## Repository Inhalte
+
+Dieses Repository enthält die technische Kernplattform.
+
+Enthalten sind:
 
 - Autoreply Mailfilter (Postfix Pipe)
 - Autoreply Services Agent (systemd Service mit HTTP API)
-- Zentrale Konfigurations- und Backup-Mechanismen
+- Zentrale Konfigurations-, Backup- und Restore-Mechanismen
 - Installations- und Betriebslogik
-- Dokumentation für Architektur, Security und API
+- Technische Dokumentation
+
+Die Web-Konsole ist logisch Teil der Plattform, wird jedoch separat installiert und betrieben.
 
 ---
 
 ## Gesamtarchitektur
 
-Die Plattform ist strikt modular aufgebaut:
+Die Plattform ist strikt modular aufgebaut.
 
-- **Postfix**  
-  Übergibt E-Mails an den Autoreply Mailfilter.
+### Komponenten
 
-- **Autoreply Mailfilter**  
-  Verarbeitet eingehende E-Mails, prüft Regeln, Limits und Loop-Schutz und versendet Antworten.
-  Keine Verwaltungslogik, keine API.
+**Postfix**  
+Übergibt eingehende E-Mails an den Autoreply Mailfilter.
 
-- **Services Agent (HTTP API)**  
-  Zentrale Steuerinstanz für Konfigurationen.
-  Validiert, speichert, versioniert und stellt Backups und Rollbacks bereit.
+**Autoreply Mailfilter**  
+Verarbeitet E-Mails, prüft Regeln, Limits und Loop-Schutz und versendet Antworten.  
+Keine Verwaltungslogik, keine API.
 
-- **Autoresponder Console (WWW)**  
-  Webbasierte Administrationsoberfläche.
-  Greift ausschliesslich über die API zu.
-  Keine direkte Mailverarbeitung.
+**Services Agent (HTTP API)**  
+Zentrale Steuerinstanz für Konfigurationen.  
+Validierung, Versionierung, Backup und Rollback.
 
-**Datenfluss:**
+**Autoresponder Console (WWW)**  
+Optionale webbasierte Administrationsoberfläche.  
+Greift ausschliesslich über die API zu und verarbeitet keine E-Mails.
+
+### Datenfluss
 
 GUI → Services Agent → JSON-Konfigurationen → Mailfilter → Postfix
 
+Der Mailfluss bleibt auch bei Ausfall von GUI oder API vollständig funktionsfähig.
+
 ---
 
-## Installation (install.sh)
+## Installation
 
-Die komplette Plattform wird über ein einziges Installationsskript installiert:
+Die technische Plattform wird vollständig über ein zentrales Installationsskript eingerichtet.
 
-```bash
+~~~bash
 sudo ./install.sh
-```
+~~~
 
-### Was `install.sh` installiert
+### Was install.sh installiert
 
 - Anlegen von Service-Usern und Gruppen
 - Deployment des Autoreply Mailfilters
@@ -73,10 +125,11 @@ sudo ./install.sh
 - Installation und Aktivierung der systemd Services
 - Initiales Anlegen von Konfigurations- und Backup-Verzeichnissen
 
-### Was **nicht** installiert wird
+### Was install.sh bewusst nicht installiert
 
-- Web-/GUI-Komponenten
+- Web-Konsole
 - Reverse Proxies
+- TLS-Termination
 - Externe Monitoring- oder Logging-Systeme
 
 ---
@@ -87,71 +140,57 @@ sudo ./install.sh
 - Postfix installiert und aktiv
 - Perl und Python verfügbar
 - Root-Zugriff für Installation
-- Interner Betrieb (kein Internet-Exposure vorgesehen)
+- Interner Betrieb vorgesehen
 
 ---
 
-## Web-Konsole (Autoresponder Console)
+## Web-Konsole (optional)
 
-Die Web-Konsole dient der komfortablen Administration und Visualisierung.
-Sie ist **kein Bestandteil von `install.sh`**, ergänzt die Plattform aber funktional.
+Die Autoresponder Console dient der komfortablen Administration und Visualisierung.  
+Sie ist kein Bestandteil von install.sh, ergänzt die Plattform aber funktional.
 
 ### Funktionen
 
-- Verwaltung von Autoreply-Einträgen (E-Mail / Domain)
+- Verwaltung von Autoreply-Einträgen (E-Mail und Domain)
 - HTML- und Text-Templates mit Platzhaltern
 - Live-Quelle und Origin-Vergleich
-- Backup-, Diff- und Restore-Funktion
+- Backup-, Diff- und Restore-Funktionen
 - Verteilung auf mehrere Mailserver
 
-### Screenshots
-
-> Lege die Screenshots z. B. unter `docs/screenshots/` ab.
-
-**Autoreply Verwaltung**
-![Autoreply Verwaltung](docs/screenshots/autoreply_verwaltung.png)
-
-**Eintrag bearbeiten**
-![Eintrag bearbeiten](docs/screenshots/eintrag_bearbeiten.png)
-
-**Deploy & Backup Übersicht**
-![Deploy & Backup](docs/screenshots/deploy_backup.png)
-
-**Backup Diff Ansicht**
-![Backup Diff](docs/screenshots/backup_diff.png)
+Screenshots können unter `docs/screenshots/` abgelegt werden.
 
 ---
 
 ## Betriebskonzept
 
-- Mailfluss ist unabhängig von API und GUI
-- Konfigurationsänderungen erfolgen nur über den Services Agent
-- Keine manuellen JSON-Edits im Produktivbetrieb
-- Jede Änderung erzeugt ein Backup
-- Rollbacks jederzeit möglich
+- Mailverarbeitung ist vollständig entkoppelt von API und GUI
+- Konfigurationsänderungen erfolgen ausschliesslich über den Services Agent
+- Keine manuellen JSON-Änderungen im Produktivbetrieb
+- Jede Änderung erzeugt automatisch ein Backup
+- Rollbacks sind jederzeit möglich
 
 ---
 
 ## Sicherheit
 
-- Interner Betrieb, keine Public-Exposition
+- Interner Betrieb ohne Public Exposure
 - API-Zugriff über IP-Allowlisten
 - Optionale TLS-Absicherung
-- Eigene Service-User
-- Keine Secrets im Code
+- Dedizierte Service-User ohne Root-Betrieb
+- Keine Secrets im Code oder Repository
 - Nachvollziehbare Änderungen durch Backups und Diffs
 
-Details siehe:
-- `SECURITY.md`
+Details siehe `SECURITY.md`.
 
 ---
 
 ## Dokumentation
 
-- `README.md` – Gesamtübersicht und Installation
-- `autoreply/README.md` – Mailfilter
-- `services-agent/README.md` – Service-Betrieb
-- `services-agent/README_API.md` – HTTP API
+- README.md Gesamtübersicht und Installation
+- autoreply/README.md Mailfilter
+- services-agent/README.md Service-Betrieb
+- services-agent/README_API.md HTTP API
+- SECURITY.md Sicherheitskonzept
 
 ---
 
