@@ -1,7 +1,19 @@
-# Autoreply Plattform
+
+
+# Autoreply Plattform - Zentrale Auto-Response Verwaltung für Postfix-Cluster
 
 Die **Autoreply Plattform** ist eine vollumfängliche Lösung für automatische Antworten in Postfix-basierten Mailinfrastrukturen.
 Sie kombiniert eine robuste Mailfilter-Runtime mit einer zentralen Service- und API-Ebene sowie einer webbasierten Administrationsoberfläche.
+
+## Lösung für echte Probleme:
+- **Verwaltet mehrern Postfix-Server von einer Web-Oberfläche aus**
+- **Automatische Backup & Versionierung** bei jeder Änderung
+- **Sofortiges Deployment** auf alle Server mit einem Klick
+
+## Ideal für:
+- Unternehmen mit **mehreren Postfix-Servern**
+- **100- 2000 Fachanwendungen** die Auto-Responses benötigen (HR, Finanzen, Support)
+- Teams die **Compliance & Änderungshistorien** benötigen
 
 Die Installation erfolgt **zentral über `install.sh`** und richtet alle benötigten Komponenten ein.
 Die Web-Konsole ist **nicht Teil von `install.sh`** und wird separat betrieben.
@@ -41,24 +53,6 @@ Die Plattform ist strikt modular aufgebaut:
 **Datenfluss:**
 
 GUI → Services Agent → JSON-Konfigurationen → Mailfilter → Postfix
-
-
-                   ┌─────────────────┐
-                   │   Deine Web-GUI  │  (Einmal Änderung)
-                   └─────────┬───────┘
-                             ↓
-                   ┌─────────────────┐
-                   │ Services Agent   │  (Validiert, speichert Backup)
-                   │ (nur auf 1 Server)│
-                   └─────────┬───────┘
-                             ↓
-        ┌──────────┬─────────┼─────────┬──────────┐
-        ↓          ↓         ↓         ↓          ↓
-    ┌──────┐  ┌──────┐  ┌──────┐  ┌──────┐  ┌──────┐
-    │Server1│  │Server2│  │Server3│  │Server4│  │Server5│
-    └──────┘  └──────┘  └──────┘  └──────┘  └──────┘
-      JSON      JSON      JSON      JSON      JSON
-
 
 ---
 
