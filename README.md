@@ -14,10 +14,12 @@
 ![Python](https://img.shields.io/badge/python-3.6%2B-yellow)
 ![Security](https://img.shields.io/badge/CodeQL-Security%20Scan-blueviolet)
 
-> **Projekt:** autoreply 
-> **Beschreibung:** Verwaltung automatischer E-Mail-Antworten
-> **Repository:** https://github.com/hec1976/autoreply 
 
+> **Projekt:** autoreply
+> **Beschreibung:** Verwaltung automatischer E-Mail-Antworten
+> **Repository:** https://github.com/hec1976/autoreply
+
+----
 
 Zentrale Auto-Response Verwaltung für Postfix-Cluster
 
