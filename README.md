@@ -5,12 +5,12 @@
 Die **Autoreply Plattform** ist eine vollumfängliche Lösung für automatische Antworten in Postfix-basierten Mailinfrastrukturen.
 Sie kombiniert eine robuste Mailfilter-Runtime mit einer zentralen Service- und API-Ebene sowie einer webbasierten Administrationsoberfläche.
 
-## Lösung für echte Probleme:
+Lösung für echte Probleme:
 - **Verwaltet mehrern Postfix-Server von einer Web-Oberfläche aus**
 - **Automatische Backup & Versionierung** bei jeder Änderung
 - **Sofortiges Deployment** auf alle Server mit einem Klick
 
-## Ideal für:
+Ideal für:
 - Unternehmen mit **mehreren Postfix-Servern**
 - **100- 2000 Fachanwendungen** die Auto-Responses benötigen (HR, Finanzen, Support)
 - Teams die **Compliance & Änderungshistorien** benötigen
