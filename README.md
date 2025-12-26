@@ -190,7 +190,6 @@ Details siehe `SECURITY.md`.
 - autoreply/README.md Mailfilter
 - services-agent/README.md Service-Betrieb
 - services-agent/README_API.md HTTP API
-- SECURITY.md Sicherheitskonzept
 
 ---
 
