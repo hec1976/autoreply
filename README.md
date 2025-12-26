@@ -1,4 +1,24 @@
 # Autoreply Plattform
+
+```
+ █████╗ ██╗   ██╗████████╗ ██████╗ ██████╗ ███████╗██████╗ ██╗     ██╗   ██╗
+██╔══██╗██║   ██║╚══██╔══╝██╔═══██╗██╔══██╗██╔════╝██╔══██╗██║     ╚██╗ ██╔╝
+███████║██║   ██║   ██║   ██║   ██║██████╔╝█████╗  ██████╔╝██║      ╚████╔╝ 
+██╔══██║██║   ██║   ██║   ██║   ██║██╔══██╗██╔══╝  ██╔═══╝ ██║       ╚██╔╝  
+██║  ██║╚██████╔╝   ██║   ╚██████╔╝██║  ██║███████╗██║     ███████╗   ██║   
+╚═╝  ╚═╝ ╚═════╝    ╚═╝    ╚═════╝ ╚═╝  ╚═╝╚══════╝╚═╝     ╚══════╝   ╚═╝
+```
+![Status](https://img.shields.io/badge/status-stable-brightgreen)
+![Version](https://img.shields.io/badge/version-1.2.0-blue)
+![License](https://img.shields.io/badge/license-MIT-purple)
+![Python](https://img.shields.io/badge/python-3.6%2B-yellow)
+![Security](https://img.shields.io/badge/CodeQL-Security%20Scan-blueviolet)
+
+> **Projekt:** autoreply 
+> **Beschreibung:** Verwaltung automatischer E-Mail-Antworten
+> **Repository:** https://github.com/hec1976/autoreply 
+
+
 Zentrale Auto-Response Verwaltung für Postfix-Cluster
 
 Die **Autoreply Plattform** ist eine vollumfängliche, produktionsreife Lösung zur zentralen Verwaltung automatischer E-Mail-Antworten in Postfix-basierten Mailinfrastrukturen.
