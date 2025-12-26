@@ -17,10 +17,10 @@
 ![Security](https://img.shields.io/badge/CodeQL-Security%20Scan-blueviolet)
 
 
-> **Projekt:** autoreply
-> **Beschreibung:** Verwaltung automatischer E-Mail-Antworten
-> **Repository:** https://github.com/hec1976/autoreply
-
+> **Projekt:** autoreply    
+> **Beschreibung:** Enterprise Autoreply Management und Compliance Plattform für Postfix-Umgebungen (GUI → API → Mailfilter)  
+> **Sprache:** Perl 5.30+ (Mailfilter), Python 3.9+ (Services Agent), PHP 8.1+ (Web-Konsole), Bash (Installation)  
+> **Zweck:** Betriebssichere und zentralisierte Verwaltung von Autoreply-Regeln für Postfix-Cluster
 ----
 
 Zentrale Auto-Response Verwaltung für Postfix-Cluster
