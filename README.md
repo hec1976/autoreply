@@ -1,139 +1,152 @@
 # Autoreply Plattform
 
-Dieses Repository enthaelt die **Autoreply Plattform** fuer Postfix-basierte Mailinfrastrukturen.
-Die Plattform stellt eine robuste, modular aufgebaute Loesung fuer automatische Antworten bereit und trennt dabei klar zwischen:
+Die **Autoreply Plattform** ist eine vollumfängliche Lösung für automatische Antworten in Postfix-basierten Mailinfrastrukturen.
+Sie kombiniert eine robuste Mailfilter-Runtime mit einer zentralen Service- und API-Ebene sowie einer webbasierten Administrationsoberfläche.
 
-- Mailverarbeitung (Runtime)
-- Konfigurations- und Steuerlogik (Service / API)
-- Administration und Automatisierung
-
-Die Installation erfolgt **zentral ueber ein install.sh Script**, welches alle benoetigten Komponenten einrichtet.
-Web- oder GUI-Komponenten sind **nicht Bestandteil** dieses Repositories.
+Die Installation erfolgt **zentral über `install.sh`** und richtet alle benötigten Komponenten ein.
+Die Web-Konsole ist **nicht Teil von `install.sh`** und wird separat betrieben.
 
 ---
 
-## Was dieses Projekt ist
+## Inhalte dieses Repositories
 
-- Produktiv faehige Autoreply Loesung
-- Fuer interne Mailplattformen gedacht
-- Kein SaaS, kein Public Service
-- Fokus auf Stabilitaet, Nachvollziehbarkeit und Betriebssicherheit
+- Autoreply Mailfilter (Postfix Pipe)
+- Autoreply Services Agent (systemd Service mit HTTP API)
+- Zentrale Konfigurations- und Backup-Mechanismen
+- Installations- und Betriebslogik
+- Dokumentation für Architektur, Security und API
 
 ---
 
 ## Gesamtarchitektur
 
-Die Plattform besteht aus folgenden Bausteinen:
+Die Plattform ist strikt modular aufgebaut:
 
-### 1. Autoreply Mailfilter
+- **Postfix**  
+  Übergibt E-Mails an den Autoreply Mailfilter.
 
-- Wird direkt in Postfix als Pipe Filter eingebunden
-- Verarbeitet eingehende Mails
-- Prueft Regeln, Limits und Loop-Schutz
-- Versendet automatische Antworten
-- Enthält **keine Verwaltungslogik**
+- **Autoreply Mailfilter**  
+  Verarbeitet eingehende E-Mails, prüft Regeln, Limits und Loop-Schutz und versendet Antworten.
+  Keine Verwaltungslogik, keine API.
 
-### 2. Autoreply Services Agent
+- **Services Agent (HTTP API)**  
+  Zentrale Steuerinstanz für Konfigurationen.
+  Validiert, speichert, versioniert und stellt Backups und Rollbacks bereit.
 
-- systemd Service (Daemon)
-- Stellt eine **interne HTTP API** bereit
-- Verwaltet Konfigurationen und Regeln
-- Erstellt automatische Backups
-- Ermoeglicht Rollbacks
-- Dient als zentrale Steuerinstanz
+- **Autoresponder Console (WWW)**  
+  Webbasierte Administrationsoberfläche.
+  Greift ausschliesslich über die API zu.
+  Keine direkte Mailverarbeitung.
 
-### 3. Konfigurationsdaten
+**Datenfluss:**
 
-- JSON Dateien fuer Server- und User-Regeln
-- ENV Dateien fuer Laufzeitparameter
-- Keine Konfiguration im Code
-- Alle Aenderungen sind versionierbar
+GUI → Services Agent → JSON-Konfigurationen → Mailfilter → Postfix
 
 ---
 
-## Installation (zentral ueber install.sh)
+## Installation (install.sh)
 
-Die komplette Plattform wird ueber **ein zentrales Installationsskript** installiert.
+Die komplette Plattform wird über ein einziges Installationsskript installiert:
 
 ```bash
 sudo ./install.sh
 ```
 
-### Was install.sh erledigt
-
-Das Script fuehrt **alle notwendigen Schritte automatisch aus**, ausser der Web-Ebene:
+### Was `install.sh` installiert
 
 - Anlegen von Service-Usern und Gruppen
-- Installation des Autoreply Mailfilters
+- Deployment des Autoreply Mailfilters
 - Installation des Services Agent
-- Setzen aller Verzeichnis- und Dateiberechtigungen
-- Deployment von systemd Service Units
-- Aktivieren und Starten der Services
+- Setzen aller benötigten Verzeichnis- und Dateiberechtigungen
+- Installation und Aktivierung der systemd Services
 - Initiales Anlegen von Konfigurations- und Backup-Verzeichnissen
 
-Nicht installiert wird:
-- WWW oder GUI Komponenten
+### Was **nicht** installiert wird
+
+- Web-/GUI-Komponenten
 - Reverse Proxies
-- Externe Monitoring Systeme
+- Externe Monitoring- oder Logging-Systeme
 
 ---
 
 ## Voraussetzungen
 
-- Linux System mit systemd
-- Postfix ist installiert und laeuft
-- Perl und Python sind verfuegbar
-- Root Zugriff fuer die Installation
-- Kein aktiver Autoreply Filter in Postfix
+- Linux mit systemd
+- Postfix installiert und aktiv
+- Perl und Python verfügbar
+- Root-Zugriff für Installation
+- Interner Betrieb (kein Internet-Exposure vorgesehen)
 
 ---
 
-## Nach der Installation
+## Web-Konsole (Autoresponder Console)
 
-Nach erfolgreicher Installation stehen folgende Komponenten bereit:
+Die Web-Konsole dient der komfortablen Administration und Visualisierung.
+Sie ist **kein Bestandteil von `install.sh`**, ergänzt die Plattform aber funktional.
 
-- Autoreply Mailfilter ist in Postfix integriert
-- Services Agent laeuft als systemd Service
-- HTTP API ist lokal oder intern erreichbar
-- Konfigurationsdateien liegen in definierten Pfaden
-- Backups werden automatisch erstellt
+### Funktionen
 
-Pruefen:
+- Verwaltung von Autoreply-Einträgen (E-Mail / Domain)
+- HTML- und Text-Templates mit Platzhaltern
+- Live-Quelle und Origin-Vergleich
+- Backup-, Diff- und Restore-Funktion
+- Verteilung auf mehrere Mailserver
 
-```bash
-systemctl status autoreply-agent
-```
+### Screenshots
+
+> Lege die Screenshots z. B. unter `docs/screenshots/` ab.
+
+**Autoreply Verwaltung**
+![Autoreply Verwaltung](docs/screenshots/autoreply_verwaltung.png)
+
+**Eintrag bearbeiten**
+![Eintrag bearbeiten](docs/screenshots/eintrag_bearbeiten.png)
+
+**Deploy & Backup Übersicht**
+![Deploy & Backup](docs/screenshots/deploy_backup.png)
+
+**Backup Diff Ansicht**
+![Backup Diff](docs/screenshots/backup_diff.png)
 
 ---
 
 ## Betriebskonzept
 
-- Mailfilter laeuft ausschliesslich ueber Postfix
-- Konfigurationsaenderungen erfolgen nur ueber den Services Agent
-- Keine manuellen JSON Edits im Produktivbetrieb
-- Rollbacks sind jederzeit moeglich
-- Fehler in Agent oder API stoppen den Mailfluss nicht
+- Mailfluss ist unabhängig von API und GUI
+- Konfigurationsänderungen erfolgen nur über den Services Agent
+- Keine manuellen JSON-Edits im Produktivbetrieb
+- Jede Änderung erzeugt ein Backup
+- Rollbacks jederzeit möglich
+
+---
+
+## Sicherheit
+
+- Interner Betrieb, keine Public-Exposition
+- API-Zugriff über IP-Allowlisten
+- Optionale TLS-Absicherung
+- Eigene Service-User
+- Keine Secrets im Code
+- Nachvollziehbare Änderungen durch Backups und Diffs
+
+Details siehe:
+- `SECURITY.md`
 
 ---
 
 ## Dokumentation
 
-- autoreply/README.md – Mailfilter und Postfix Integration
-- services-agent/README.md – Service Betrieb
-- services-agent/README_API.md – HTTP API Endpoints
-
----
-
-## Sicherheitshinweise
-
-- Die API ist nicht fuer den Internetzugriff gedacht
-- Zugriff erfolgt ueber IP Allowlisten
-- Eigene Service-User fuer alle Komponenten
-- Schreibrechte nur wo technisch notwendig
-- Backups regelmaessig pruefen
+- `README.md` – Gesamtübersicht und Installation
+- `ARCHITECTURE.md` – Architektur und Datenfluss
+- `SECURITY.md` – Security-Konzept
+- `autoreply/README.md` – Mailfilter
+- `services-agent/README.md` – Service-Betrieb
+- `services-agent/README_API.md` – HTTP API
 
 ---
 
 ## Lizenz
 
-MIT License – siehe `LICENSE`
+Dieses Projekt steht unter der **MIT Lizenz**.
+
+Siehe `LICENSE`.
