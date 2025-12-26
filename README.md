@@ -42,6 +42,24 @@ Die Plattform ist strikt modular aufgebaut:
 
 GUI → Services Agent → JSON-Konfigurationen → Mailfilter → Postfix
 
+
+                   ┌─────────────────┐
+                   │   Deine Web-GUI  │  (Einmal Änderung)
+                   └─────────┬───────┘
+                             ↓
+                   ┌─────────────────┐
+                   │ Services Agent   │  (Validiert, speichert Backup)
+                   │ (nur auf 1 Server)│
+                   └─────────┬───────┘
+                             ↓
+        ┌──────────┬─────────┼─────────┬──────────┐
+        ↓          ↓         ↓         ↓          ↓
+    ┌──────┐  ┌──────┐  ┌──────┐  ┌──────┐  ┌──────┐
+    │Server1│  │Server2│  │Server3│  │Server4│  │Server5│
+    └──────┘  └──────┘  └──────┘  └──────┘  └──────┘
+      JSON      JSON      JSON      JSON      JSON
+
+
 ---
 
 ## Installation (install.sh)
