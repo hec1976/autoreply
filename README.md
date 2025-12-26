@@ -11,7 +11,9 @@
 ![Status](https://img.shields.io/badge/status-stable-brightgreen)
 ![Version](https://img.shields.io/badge/version-1.2.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-purple)
+[![PHP](https://img.shields.io/badge/php-8.1%2B-blue)]()
 ![Python](https://img.shields.io/badge/python-3.6%2B-yellow)
+[![Perl](https://img.shields.io/badge/perl-5.30%2B-yellow)]()
 ![Security](https://img.shields.io/badge/CodeQL-Security%20Scan-blueviolet)
 
 
