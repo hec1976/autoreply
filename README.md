@@ -137,8 +137,6 @@ Details siehe:
 ## Dokumentation
 
 - `README.md` – Gesamtübersicht und Installation
-- `ARCHITECTURE.md` – Architektur und Datenfluss
-- `SECURITY.md` – Security-Konzept
 - `autoreply/README.md` – Mailfilter
 - `services-agent/README.md` – Service-Betrieb
 - `services-agent/README_API.md` – HTTP API
