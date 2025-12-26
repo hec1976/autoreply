@@ -1,0 +1,62 @@
+{
+    "autoreply": [
+        {
+            "email": [
+                "info@example.ch",
+                "support@example.ch"
+            ],
+            "from": "info@example.ch",
+            "reply-to": "info@example.ch",
+            "subject": "Abwesenheitsnotiz: Wir haben Ihre Nachricht erhalten",
+            "html": false,
+            "body": "Guten Tag\n\nVielen Dank fuer Ihre Nachricht an {ORIGINAL_DESTINATION}.\n\nWir melden uns so bald wie moeglich.\n\nOriginal Absender: {ORIGINAL_SENDER}\nOriginal Betreff: {ORIGINAL_SUBJECT}\nDatum: {ORIGINAL_DATE}\n\nMit freundlichen Gruessen\nIhr Team\n",
+            "max_replies_per_sender": 2,
+            "reply_period_hours": 24,
+            "blacklist": [
+                "newsletter@anbieter.tld",
+                "noreply@anbieter.tld"
+            ]
+        },
+        {
+            "from": "noreply@example.ch",
+            "reply-to": "support@example.ch",
+            "subject": "Automatische Antwort: Eingang bestaetigt",
+            "html": true,
+            "body": "<p>Guten Tag</p><p>Vielen Dank fuer Ihre Nachricht an <strong>{ORIGINAL_DESTINATION}</strong>.</p><p>Wir melden uns so bald wie moeglich.</p><p><strong>Original Betreff:</strong> {ORIGINAL_SUBJECT}<br><strong>Original Absender:</strong> {ORIGINAL_SENDER}<br><strong>Datum:</strong> {ORIGINAL_DATE}</p>",
+            "blacklist": [
+                "spam@evil.tld"
+            ],
+            "max_replies_per_sender": 1,
+            "reply_period_hours": 12,
+            "_comment": "",
+            "domain": [
+                "example.ch"
+            ]
+        }
+    ],
+    "blacklist": [
+        "spamdomain.tld",
+        "badguy@example.com"
+    ],
+    "filters": {
+        "header_block": {
+            "Subject": [
+                "(?i)buy\\s+now",
+                "(?i)bitcoin",
+                "(?i)viagra",
+                "(?i)investment"
+            ],
+            "List-Id": []
+        },
+        "header_allow": [
+            "(?i)From:.*@trusted\\.tld",
+            "(?i)X-Company-Tag:\\s*INTERNAL"
+        ],
+        "body_block": [
+            "(?i)free\\s+money",
+            "(?i)click\\s+here",
+            "(?i)crypto\\s+wallet"
+        ],
+        "body_allow": []
+    }
+}

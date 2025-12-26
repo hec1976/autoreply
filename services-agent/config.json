@@ -1,0 +1,28 @@
+{
+  "listen": "0.0.0.0:5010",
+  "allowed_ips": ["127.0.0.1/32", "192.168.20.0/24", "10.0.0.0/8"],
+  "trusted_proxies": ["127.0.0.1", "192.168.20.10"],
+  "client_ip_header": "X-Forwarded-For",
+  
+  "ssl_enable": 0,
+  "ssl_cert_file": "/opt/autoreply/ssl/certifikate.cert",
+  "ssl_key_file": "/opt/autoreply/ssl/private.key",
+
+  "logfile": "/opt/autoreply/log/autoreply_agent.log",
+  
+  "configDir": "/opt/autoreply/script/conf",
+  "jsonDir": "/opt/autoreply/script/json",
+  
+  "statslog": "/opt/autoreply/log/autoreply_stats.log",
+  
+  "backupDir": "/opt/autoreply/services-agent/backups",
+  "tmpDir": "/opt/autoreply/services-agent/tmp",
+
+  "maxBackups": 30,
+  "fileMode_service": "0660",
+  "fileMode_deploy": "0660",
+  "tmpFileMode": "0660",
+
+  "deployUser": "autoreply",
+  "deployGroup": "autoreply"
+}
