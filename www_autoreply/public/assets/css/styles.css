@@ -1,0 +1,229 @@
+/* =========================
+ * Basis Variablen
+ * ========================= */
+:root{
+  --ch-bg: #ffffff;
+  --ch-blue-1: #0b3c6f;   /* primär */
+  --ch-blue-2: #3b6ea5;   /* icons */
+  --ch-blue-bg: #e8f1fb;  /* hover */
+  --ch-blue-bg2:#f4f9ff;  /* active */
+  --ch-green-1:#3cb371;   /* active marker */
+  --ch-green-2:#6bb7a6;   /* hover marker */
+  --ch-border:#e5e7eb;
+}
+
+/* =========================
+ * Grundlayout
+ * ========================= */
+body{
+  padding-top: 80px !important; /* Navbar Hoehe */
+  font-size: 0.875rem;
+}
+
+/* optional: wenn du Bootstrap Container enger halten willst */
+.container{
+  max-width: 1200px;
+}
+
+/* Content Offset neben Sidebar */
+.main-content{
+  margin-left: 250px; /* Sidebar Breite */
+  padding: 20px;
+}
+
+/* =========================
+ * Headline Styling
+ * ========================= */
+h2{
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #333;
+  margin-bottom: 1.25rem;
+  text-align: left;
+}
+h3{
+  font-size: 1.10rem;
+  font-weight: 600;
+  color: #444;
+  margin-bottom: 1rem;
+  text-align: left;
+}
+h4{
+  font-size: 1.0rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 1rem;
+  text-align: left;
+}
+
+/* =========================
+ * Formulare und Tabellen
+ * ========================= */
+.form-select,
+.form-label,
+.form-control{
+  font-size: 0.875rem;
+}
+
+.table th,
+.table td{
+  font-size: 0.875rem;
+  vertical-align: middle;
+}
+
+.modal-content{
+  font-size: 0.875rem;
+}
+
+input[readonly]{
+  background-color: rgb(245, 241, 241);
+}
+
+/* =========================
+ * Navbar Simple
+ * ========================= */
+.navbar-simple{
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+
+  height: 80px;
+  z-index: 1030;
+
+  background: var(--ch-bg);
+  border-bottom: 1px solid var(--ch-border);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+}
+
+.navbar-simple::after{
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--ch-blue-1), var(--ch-blue-2), var(--ch-green-1));
+  opacity: 0.9;
+}
+
+.navbar-content{
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 22px;
+  gap: 16px;
+}
+
+.navbar-logo{
+  height: 54px;
+  width: auto;
+}
+
+.navbar-title{
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--ch-blue-1);
+  letter-spacing: 0.2px;
+}
+
+.navbar-spacer{ flex: 1; }
+
+/* =========================
+ * Sidebar
+ * ========================= */
+#sidebar{
+  width: 250px;
+  background: #f8fafc;
+  border-right: 1px solid var(--ch-border);
+  padding-top: 20px;
+
+  position: fixed;
+  top: 80px; /* direkt unter Navbar */
+  bottom: 0;
+  left: 0;
+
+  z-index: 998;
+  overflow-y: auto;
+}
+
+#sidebar a{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  margin: 2px 10px;
+  border-radius: 6px;
+  padding: 10px 14px;
+
+  color: #1f3a5f;
+  text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease;
+  border-left: 4px solid transparent;
+}
+
+#sidebar a i{
+  width: 22px;
+  text-align: center;
+  font-size: 1.05rem;
+  color: var(--ch-blue-2);
+  transition: color 0.15s ease;
+}
+
+#sidebar a:hover{
+  background-color: var(--ch-blue-bg);
+  color: var(--ch-blue-1);
+  border-left-color: var(--ch-green-2);
+}
+#sidebar a:hover i{
+  color: var(--ch-blue-1);
+}
+
+#sidebar a.active{
+  background-color: var(--ch-blue-bg2);
+  color: var(--ch-blue-1);
+  font-weight: 600;
+  border-left-color: var(--ch-green-1);
+}
+#sidebar a.active i{
+  color: var(--ch-blue-1);
+}
+
+/* =========================
+ * Pagination
+ * ========================= */
+.pagination .page-link{
+  color: #000 !important;
+  background-color: #fff !important;
+  border: 1px solid #ddd !important;
+  padding: 7px 12px !important;
+  font-size: 14px !important;
+  border-radius: 0.35rem;
+  transition: background 0.2s, color 0.2s;
+}
+.pagination .page-link:hover{
+  color: #fff !important;
+  background-color: #848888 !important;
+  border-color: #848888 !important;
+}
+.pagination .page-item.active .page-link{
+  color: #fff !important;
+  background-color: #848888 !important;
+  border-color: #848888 !important;
+}
+
+/* =========================
+ * Mobile
+ * ========================= */
+@media (max-width: 768px){
+  #sidebar{
+    position: relative;
+    width: 100%;
+    top: 0;
+    height: auto;
+  }
+  .main-content{
+    margin-left: 0;
+    padding: 20px;
+  }
+}
