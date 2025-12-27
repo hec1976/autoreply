@@ -192,7 +192,7 @@ Sie ist kein Bestandteil von install.sh, ergänzt die Plattform aber funktional.
 - Backup-, Diff- und Restore-Funktionen
 - Verteilung auf mehrere Mailserver
 
-Screenshots können unter `docs/screenshots/` abgelegt werden.
+Siehe Screenshots können unter `docs/screenshots/`.
 
 ---
 
