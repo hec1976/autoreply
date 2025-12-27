@@ -136,12 +136,17 @@ Der Mailfluss bleibt auch bei Ausfall von GUI oder API vollständig funktionsfä
 
 Die technische Plattform wird vollständig über ein zentrales Installationsskript eingerichtet.
 
+**SUSE:**  
 ~~~bash
 sudo zypper install perl-Mojolicious perl-JSON perl-Net-CIDR perl-Log-Log4perl && echo "Module installiert"
 ~~~
+
+**Debian/Ubuntu:**  
 ~~~bash
 sudo apt update && sudo apt install libmojolicious-perl libjson-maybexs-perl libnet-cidr-perl liblog-log4perl-perl && echo "Module installiert
 ~~~
+
+**Install:**  
 ~~~bash
 sudo ./install.sh
 ~~~
