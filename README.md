@@ -204,8 +204,6 @@ Screenshots können unter `docs/screenshots/` abgelegt werden.
 - Keine Secrets im Code oder Repository
 - Nachvollziehbare Änderungen durch Backups und Diffs
 
-Details siehe `SECURITY.md`.
-
 ---
 
 ## Dokumentation
