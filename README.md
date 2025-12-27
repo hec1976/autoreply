@@ -19,7 +19,7 @@
 
 > **Projekt:** autoreply    
 > **Beschreibung:** Enterprise Autoreply Management und Compliance Plattform für Postfix-Umgebungen (GUI → API → Mailfilter)  
-> **Sprache:** Perl 5.30+ (Mailfilter), Python 3.9+ (Services Agent), PHP 8.1+ (Web-Konsole), Bash (Installation)  
+> **Sprache:** Perl 5.30+ (Mailfilter), Python 3.6+ (Services Agent), PHP 8.1+ (Web-Konsole), Bash (Installation)  
 > **Zweck:** Betriebssichere und zentralisierte Verwaltung von Autoreply-Regeln für Postfix-Cluster
 ----
 
