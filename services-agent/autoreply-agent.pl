@@ -4,6 +4,7 @@ use strict;
 use warnings;
 
 use Mojolicious::Lite;
+
 use JSON::MaybeXS qw(decode_json);
 use File::Basename qw(basename dirname);
 use File::Copy qw(copy);
@@ -15,12 +16,17 @@ use IO::Handle ();
 use Time::Piece;
 use File::Path qw(make_path);
 use Fcntl qw(SEEK_SET);
-
+use Fcntl qw(:flock);  
 
 umask 0007;
 
 # Globale Variable für die Konfiguration (nur einmal deklariert)
 my $Config;
+
+# Globale Variable für Rate Limiting
+my %rate_limits;
+
+
 
 # ---------- Helpers ----------
 sub ensure_dir {
@@ -208,6 +214,9 @@ sub success_json {
 }
 
 # ---------- upload atomar ----------
+use Fcntl qw(:flock);  # Hinzufügen am Anfang
+
+# In der atomic_upload-Subroutine:
 sub atomic_upload {
     my ($up, $dest) = @_;
     return 0 unless $up && $dest;
@@ -221,11 +230,16 @@ sub atomic_upload {
         $up->move_to($tmp) or die "move_to fehlgeschlagen: " . $up->error;
         chmod_safe($tmp, $tmpFileMode);
 
+        # Dateisperre für Zieldatei
+        open my $dest_fh, '>>', $dest or die "Kann $dest nicht öffnen: $!";
+        flock($dest_fh, LOCK_EX) or die "Kann $dest nicht sperren: $!";
         ensure_dir(dirname($dest)) or die "Zielverzeichnis fehlt oder ist nicht beschreibbar";
         if (!rename $tmp, $dest) {
             copy($tmp, $dest) or die "copy fehlgeschlagen: $!";
             unlink $tmp or app->log->warn("Kann temporäre Datei nicht löschen: $tmp");
         }
+        flock($dest_fh, LOCK_UN);  # Sperre freigeben
+        close $dest_fh;
 
         chmod_safe($dest, $fileModeDeploy);
         chown_safe($dest, $deployUID, $deployGID);
@@ -240,7 +254,7 @@ sub atomic_upload {
     return 1;
 }
 
-# ---------- backups (ASYNCHRON) ----------
+# In der create_file_backup-Subroutine:
 sub create_file_backup {
     my ($kind, $source_file) = @_;
     return unless -f $source_file;
@@ -251,7 +265,12 @@ sub create_file_backup {
             my $dest = File::Spec->catfile($backupDir, "${kind}_${ts}.json");
             eval {
                 ensure_dir($backupDir) or die "backupDir fehlt";
+                # Dateisperre für Quelldatei
+                open my $src_fh, '<', $source_file or die "Kann $source_file nicht öffnen: $!";
+                flock($src_fh, LOCK_SH) or die "Kann $source_file nicht sperren: $!";
                 copy($source_file, $dest) or die "copy fehlgeschlagen: $!";
+                flock($src_fh, LOCK_UN);  # Sperre freigeben
+                close $src_fh;
                 chmod_safe($dest, $fileModeService);
 
                 my @list = sort { $b cmp $a } bsd_glob("$backupDir/${kind}_*.json");
@@ -276,6 +295,7 @@ sub create_file_backup {
         }
     );
 }
+
 
 sub client_ip {
     my ($c) = @_;
@@ -317,6 +337,24 @@ hook after_dispatch => sub {
         $Config = undef;  # Cache invalidieren
     }
 };
+
+# ----------  Hook für Rate Limiting ---------- 
+hook before_dispatch => sub {
+    my $c = shift;
+    my $ip = client_ip($c);
+
+    my $now = time;
+    if (!$rate_limits{$ip} || $rate_limits{$ip}{last} < $now - 1) {
+        $rate_limits{$ip} = { count => 1, last => $now };
+    } else {
+        $rate_limits{$ip}{count}++;
+        if ($rate_limits{$ip}{count} > 10) {
+            return $c->render(json => { ok => 0, error => "Rate limit exceeded. Try again later." }, status => 429);
+        }
+    }
+};
+
+
 
 # ---------- routes ----------
 post '/autoreply/server/config' => sub {
