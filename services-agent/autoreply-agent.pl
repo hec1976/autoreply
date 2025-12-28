@@ -341,6 +341,8 @@ hook after_dispatch => sub {
 Mojo::IOLoop->recurring(86400 => sub {
     my $now = time;
     my $cutoff = $now - (3600 * 24);
+
+    # 1. Alte temporäre Dateien löschen
     opendir(my $dh, $tmpDir) or do {
         app->log->error("Kann tmpDir nicht öffnen: $!");
         return;
@@ -355,8 +357,12 @@ Mojo::IOLoop->recurring(86400 => sub {
         }
     }
     closedir($dh);
-    app->log->info("Housekeeping: Alte temporäre Dateien gelöscht.");
+
+    # 2. Rate-Limit-Speicher bereinigen
+    %rate_limits = ();
+    app->log->info("Housekeeping: Alte temporäre Dateien gelöscht und Rate-Limits zurückgesetzt.");
 });
+
 
 # =============================================
 # ROUTEN
