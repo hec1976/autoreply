@@ -66,8 +66,8 @@ fi
 
 FILES=(
   "$BASE_DIR/config.conf"
-  "$BASE_DIR/json/autoreply_server.json"
-  "$BASE_DIR/conf/autoreply_user.json"
+  "$BASE_DIR/json/autoreply_user.json"
+  "$BASE_DIR/conf/autoreply_server.json"
 )
 
 for f in "${FILES[@]}"; do
