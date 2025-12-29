@@ -5,7 +5,7 @@ Diese Anleitung beschreibt die Monit-Überwachung für den `autoreply-agent`-Ser
 
 ---
 
-## 📋 Konfiguration
+## Konfiguration
 
 ### 1. Monit-Konfiguration
 Erstelle die Datei `/etc/monit/conf.d/autoreply-agent.conf` mit folgendem Inhalt:
@@ -45,7 +45,7 @@ check file autoreply_log with path /var/log/mmbb/autoreply-agent.log
 
 ---
 
-## 🔧 Einrichtung
+## Einrichtung
 
 ### 1. Konfiguration speichern
 ```bash
@@ -69,7 +69,7 @@ sudo monit status
 
 ---
 
-## 🚨 Alerting
+## Alerting
 
 ### E-Mail-Alerts
 Füge in `/etc/monit/monitrc` hinzu:
@@ -80,7 +80,7 @@ set mailserver localhost
 
 ---
 
-## 📌 Überwachte Komponenten
+## Überwachte Komponenten
 
 | Komponente               | Check                                                                 |
 |--------------------------|-----------------------------------------------------------------------|
@@ -91,7 +91,7 @@ set mailserver localhost
 
 ---
 
-## 🛠️ Fehlerbehebung
+## Fehlerbehebung
 
 | Problem                          | Lösung                                                                 |
 |----------------------------------|------------------------------------------------------------------------|
