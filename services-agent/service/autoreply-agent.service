@@ -1,5 +1,5 @@
 [Unit]
-Description=Autoreply Agent Service (hardened)
+Description=Autoreply Agent Service (tmpfs-root)
 Wants=network-online.target
 After=network.target network-online.target
 
@@ -12,83 +12,58 @@ ExecStart=/usr/bin/perl /opt/autoreply/services-agent/autoreply-agent.pl
 EnvironmentFile=/opt/autoreply/env/autoreply-agent.env
 UMask=0007
 
-# ENV/Path härten
-Environment=PATH=/usr/bin:/usr/sbin
-UnsetEnvironment=PERL5LIB PERLLIB PERL5OPT IFS CDPATH ENV BASH_ENV
-# optional:
-UnsetEnvironment=LD_PRELOAD LD_LIBRARY_PATH
+# Grundumgebung
+Environment=PATH=/usr/bin:/usr/sbin:/bin:/sbin
+UnsetEnvironment=PERL5LIB PERLLIB PERL5OPT IFS CDPATH ENV BASH_ENV LD_PRELOAD LD_LIBRARY_PATH LD_AUDIT
 
-# Restart
-TimeoutStartSec=30
+# Restart-Policy
 Restart=on-failure
-RestartSec=3s
+RestartSec=5s
+TimeoutStartSec=30
+
+# tmpfs-Root
+TemporaryFileSystem=/
+
+# Essentielle Systempfade (schreibgeschützt)
+BindReadOnlyPaths=/usr
+BindReadOnlyPaths=/lib
+BindReadOnlyPaths=/lib64
+BindReadOnlyPaths=/bin
+BindReadOnlyPaths=/sbin
+BindReadOnlyPaths=/etc/resolv.conf
+BindReadOnlyPaths=/etc/passwd
+BindReadOnlyPaths=/etc/group
+
+# Projektverzeichnisse
+BindPaths=/opt/autoreply
+
+# Schreibzugriff für den Service
+ReadWritePaths=/opt/autoreply/log      
+ReadWritePaths=/opt/autoreply/services-agent/tmp  
+ReadWritePaths=/opt/autoreply/script/json 
+ReadWritePaths=/opt/autoreply/script/conf
 
 # Sandboxing
 NoNewPrivileges=yes
 RestrictSUIDSGID=yes
-ProtectSystem=strict
-ProtectHome=true
-ProtectKernelModules=true
-ProtectKernelTunables=true
-ProtectControlGroups=true
-ProtectClock=true
-ProtectHostname=true
-ProtectKernelLogs=true
-PrivateTmp=true
-PrivateDevices=true
-PrivateMounts=true
 LockPersonality=yes
-RestrictNamespaces=yes
 RestrictRealtime=yes
-KeyringMode=private
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectHome=yes
+ProtectSystem=strict
 ProcSubset=pid
 ProtectProc=invisible
-MemoryDenyWriteExecute=true
+MemoryDenyWriteExecute=yes
 SystemCallArchitectures=native
 SystemCallFilter=@system-service
 SystemCallFilter=~@obsolete
-
-# Netzwerk
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
-# nur Loopback?:
-# IPAddressDeny=any
-# IPAddressAllow=127.0.0.1 
+KeyringMode=private
 
-# Default-deny Filesystem
-TemporaryFileSystem=/
-
-# Binaries/Libs
-BindReadOnlyPaths=/usr:/usr
-BindReadOnlyPaths=/usr/share:/usr/share
-BindReadOnlyPaths=/lib:/lib
-BindReadOnlyPaths=/lib64:/lib64
-BindReadOnlyPaths=/bin:/bin
-BindReadOnlyPaths=/sbin:/sbin
-
-# /etc-Basics
-BindReadOnlyPaths=/etc/hosts
-BindReadOnlyPaths=/etc/resolv.conf
-BindReadOnlyPaths=/etc/nsswitch.conf
-BindReadOnlyPaths=/etc/localtime
-BindReadOnlyPaths=/etc/machine-id
-
-BindReadOnlyPaths=/etc/passwd
-BindReadOnlyPaths=/etc/group
-
-#-----------------------------------
-# Verzeichnis schreiben
-#------------------------------------
-BindPaths=/opt/autoreply
-
-#-----------------------------------
-# Verzeichnis lesen
-#-----------------------------------
-# BindReadOnlyPaths=
-
-# Caps minimal (keine nötig)
+# Caps minimal und korrekt
 AmbientCapabilities=CAP_CHOWN CAP_FOWNER
 CapabilityBoundingSet=CAP_CHOWN CAP_FOWNER
-SecureBits=noroot-locked
 
 # Logging
 StandardOutput=journal
