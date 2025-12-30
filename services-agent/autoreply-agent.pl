@@ -2,29 +2,26 @@
 use v5.20;
 use strict;
 use warnings;
-use autodie;
-use namespace::clean;
 
 use Mojolicious::Lite;
-use JSON::MaybeXS qw(decode_json encode_json);
+use JSON::MaybeXS qw(decode_json);
 use File::Basename qw(basename dirname);
 use File::Copy qw(copy);
 use File::Spec;
 use File::Glob ':glob';
 use Net::CIDR;
 use FindBin qw($Bin);
+use IO::Handle ();
 use Time::Piece;
 use File::Path qw(make_path);
 use Fcntl qw(SEEK_SET);
 use JSON::Validator;
 use Mojo::Util qw(secure_compare);
-use File::ChangeNotify;
 
 umask 0007;
 
-# Globale Variable für die Konfiguration (mit Caching)
+# Global variable for configuration (cached)
 my $Config;
-my $config_file_watcher;
 
 # ---------- Helpers ----------
 sub ensure_dir {
@@ -33,7 +30,7 @@ sub ensure_dir {
     my $dir = -d $path ? $path : dirname($path);
     return 1 if -d $dir && -w $dir;
     eval { make_path($dir); 1 } or do {
-        app->log->error("Konnte Verzeichnis nicht anlegen: $path");
+        app->log->warn("Could not create directory: $path");
         return 0;
     };
     return 1;
@@ -43,7 +40,7 @@ sub chown_safe {
     my ($path, $uid, $gid) = @_;
     return 1 unless -e $path;
     eval { chown $uid, $gid, $path or die $!; 1 } or do {
-        app->log->error("chown fehlgeschlagen für $path: $!");
+        app->log->warn("chown failed for $path: $!");
         return 0;
     };
     return 1;
@@ -53,29 +50,29 @@ sub chmod_safe {
     my ($path, $mode) = @_;
     return 1 unless -e $path;
     eval { chmod $mode, $path or die $!; 1 } or do {
-        app->log->error("chmod fehlgeschlagen für $path: $!");
+        app->log->warn("chmod failed for $path: $!");
         return 0;
     };
     return 1;
 }
 
-# ---------- Config laden (mit Caching und Watcher) ----------
+# ---------- Load config (with caching) ----------
 sub load_config {
     return $Config if $Config;
 
     my $configfile = "$Bin/config.json";
-    die "Config $configfile fehlt!\n" unless -f $configfile;
+    die "Config file $configfile missing!\n" unless -f $configfile;
 
-    open my $fh, "<:encoding(UTF-8)", $configfile;
+    open my $fh, "<:encoding(UTF-8)", $configfile or die "Config not readable: $!";
     local $/;
     my $json = <$fh>;
     close $fh;
 
     my $config;
-    eval { $config = decode_json($json); 1 } or die "Config JSON ungültig ($configfile): $@\n";
-    die "Config JSON ist kein Objekt\n" unless ref($config) eq 'HASH';
+    eval { $config = decode_json($json); 1 } or die "Invalid config JSON ($configfile): $@\n";
+    die "Config JSON is not an object\n" unless ref($config) eq 'HASH';
 
-    # Defaults setzen
+    # Set defaults
     $config->{maxUploadMB}        //= 25;
     $config->{fileMode_service}   //= '0660';
     $config->{fileMode_deploy}    //= '0660';
@@ -85,50 +82,37 @@ sub load_config {
     $config->{allowed_ips}        //= ['127.0.0.1'];
     $config->{client_ip_header}   //= 'X-Forwarded-For';
 
-    # CIDR-Validierung
+    # CIDR validation
     my @acl_cidrs = ref $config->{allowed_ips} eq 'ARRAY'
         ? @{$config->{allowed_ips}}
         : split /\s*,\s*/, ($config->{allowed_ips} // '127.0.0.1');
     for my $cidr (@acl_cidrs) {
-        die "Ungültige CIDR-Notation: $cidr\n" unless Net::CIDR::cidrvalidate($cidr);
+        die "Invalid CIDR notation: $cidr\n" unless Net::CIDR::cidrvalidate($cidr);
     }
 
     $Config = $config;
-    setup_config_watcher($configfile);
     return $Config;
 }
 
-sub setup_config_watcher {
-    my ($file) = @_;
-    $config_file_watcher = File::ChangeNotify->instantiate_watcher(
-        directories => [dirname($file)],
-        filter      => sub { $_[0] eq basename($file) },
-    );
-    $config_file_watcher->watch(sub {
-        app->log->info("Config-Datei geändert, Cache wird invalidiert");
-        $Config = undef;
-    });
-}
-
-# Konfiguration laden
+# Load configuration
 $Config = load_config();
 
-# Upload Limit
+# Upload limit
 my $max_mb = $Config->{maxUploadMB} // 25;
 my $max_bytes = $max_mb * 1024 * 1024;
 $ENV{MOJO_MAX_MESSAGE_SIZE} = $max_bytes;
 app->max_request_size($max_bytes);
 
-# env token
-my $api_token = $ENV{API_TOKEN} or die "ENV API_TOKEN ist erforderlich!\n";
+# Environment token
+my $api_token = $ENV{API_TOKEN} or die "ENV API_TOKEN is required!\n";
 
-# net / listen
-my $LOGFILE     = $Config->{logfile} // "$Bin/autoreply-agent.log";
+# Network/listen settings
+my $LOGFILE     = $Config->{logfile} // '/var/log/mmbb/autoreply-agent.log';
 my @acl_cidrs   = ref $Config->{allowed_ips} eq 'ARRAY'
     ? @{ $Config->{allowed_ips} }
     : split /\s*,\s*/, ($Config->{allowed_ips} // '127.0.0.1');
 
-# Trusted Proxies und Client IP Header aus Config
+# Trusted proxies and client IP header from config
 my @trusted_proxies = ();
 if (ref($Config->{trusted_proxies}) eq 'ARRAY') {
     @trusted_proxies = @{ $Config->{trusted_proxies} };
@@ -141,37 +125,37 @@ my @ip_headers = (
     'CF-Connecting-IP',
 );
 
-# Pfade
-my $configDir   = $Config->{configDir}   or die "configDir fehlt!";
-my $jsonDir     = $Config->{jsonDir}     or die "jsonDir fehlt!";
+# Paths
+my $configDir   = $Config->{configDir}   or die "configDir missing!";
+my $jsonDir     = $Config->{jsonDir}     or die "jsonDir missing!";
 my $templateDir = $Config->{templateDir} // '';
-my $statslog    = $Config->{statslog}    or die "statslog fehlt!";
-my $backupDir   = $Config->{backupDir}   or die "backupDir fehlt!";
-my $tmpDir      = $Config->{tmpDir}      or die "tmpDir fehlt!";
+my $statslog    = $Config->{statslog}    or die "statslog missing!";
+my $backupDir   = $Config->{backupDir}   or die "backupDir missing!";
+my $tmpDir      = $Config->{tmpDir}      or die "tmpDir missing!";
 
-# filemodes
+# File modes
 my $maxBackups      = $Config->{maxBackups}        // 20;
 my $maxBackupAgeDays = $Config->{maxBackupAgeDays}  // 30;
 my $fileModeService = oct($Config->{fileMode_service} // '0660');
 my $fileModeDeploy  = oct($Config->{fileMode_deploy}  // '0660');
 my $tmpFileMode     = oct($Config->{tmpFileMode}      // '0660');
 
-# deploy owner/group
-my $deployUser  = $Config->{deployUser}  or die "deployUser fehlt!";
-my $deployGroup = $Config->{deployGroup} or die "deployGroup fehlt!";
-my $deployUID   = getpwnam($deployUser)  // die "Benutzer $deployUser existiert nicht!";
-my $deployGID   = getgrnam($deployGroup) // die "Gruppe $deployGroup existiert nicht!";
+# Deploy user/group
+my $deployUser  = $Config->{deployUser}  or die "deployUser missing!";
+my $deployGroup = $Config->{deployGroup} or die "deployGroup missing!";
+my $deployUID   = getpwnam($deployUser)  // die "User $deployUser does not exist!";
+my $deployGID   = getgrnam($deployGroup) // die "Group $deployGroup does not exist!";
 
-# ---------- Logdir sicherstellen ----------
-ensure_dir(dirname($LOGFILE)) or die "Konnte Logdir nicht anlegen: " . dirname($LOGFILE) . "\n";
+# ---------- Ensure log directory ----------
+ensure_dir(dirname($LOGFILE)) or die "Could not create log directory: " . dirname($LOGFILE) . "\n";
 
-# Log-Datei öffnen und Rechte setzen
-open(my $lfh, ">>:encoding(UTF-8)", $LOGFILE) or die "Logfile nicht schreibbar: $LOGFILE ($!)\n";
+# Open log file and set permissions
+open(my $lfh, ">>:encoding(UTF-8)", $LOGFILE) or die "Log file not writable: $LOGFILE ($!)\n";
 close $lfh;
 chmod_safe($LOGFILE, $fileModeService);
 chown_safe($LOGFILE, $deployUID, $deployGID);
 
-# Mojolicious-Logging auf Datei umleiten
+# Redirect Mojolicious logging to file
 app->log->path($LOGFILE);
 app->log->level('info');
 
@@ -180,22 +164,22 @@ app->hook(around_dispatch => sub {
     my $ok = eval { $next->(); 1 };
     return if $ok;
     my $err = $@ || 'Unknown error';
-    app->log->error("Request failed: $err (IP: " . client_ip($c) . ", Path: " . $c->req->url->path . ")");
+    app->log->error("Request failed: $err (Path: " . $c->req->url->path . ")");
     $c->res->code(500);
     $c->res->headers->content_type('application/json; charset=UTF-8');
-    $c->render(json => { ok => 0, error => "$err" });
+    $c->render(json => { ok => 0, error => "Internal server error" });
 });
 
-# ---------- Verzeichnisse sicherstellen ----------
+# ---------- Ensure directories ----------
 for my $p ($configDir, $jsonDir, $templateDir, dirname($statslog), $backupDir, $tmpDir) {
     next unless $p;
     unless (ensure_dir($p)) {
-        app->log->error("Konnte Verzeichnis nicht anlegen: $p");
-        die "Kritischer Fehler: Verzeichnis $p fehlt oder ist nicht anlegbar\n";
+        app->log->error("Could not create directory: $p");
+        die "Critical error: Directory $p missing or not creatable\n";
     }
 }
 
-# Ownership nur für config relevante Assets
+# Set ownership for config-relevant assets
 for my $p (grep { $_ } ($configDir, $jsonDir, $templateDir, $statslog)) {
     my $target = $p;
     if (-e $target) {
@@ -211,7 +195,7 @@ for my $p (grep { $_ } ($configDir, $jsonDir, $templateDir, $statslog)) {
 sub fail_json {
     my ($c, $msg, $st) = @_;
     $st //= 400;
-    app->log->error("$msg (IP: " . client_ip($c) . ", Path: " . $c->req->url->path . ")");
+    app->log->error("$msg (Path: " . $c->req->url->path . ")");
     $c->render(json => { ok => 0, error => $msg, status => $st }, status => $st);
 }
 
@@ -220,57 +204,44 @@ sub success_json {
     $st //= 200;
     $d->{ok} = 1       unless exists $d->{ok};
     $d->{status} = $st unless exists $d->{status};
-    app->log->info("Erfolgreich: status=$st");
+    app->log->info("Success: status=$st");
     $c->render(json => $d, status => $st);
 }
 
-# ---------- upload atomar ----------
+# ---------- Atomic upload ----------
 sub atomic_upload {
     my ($up, $dest) = @_;
     return 0 unless $up && $dest;
 
-    # Content-Type prüfen
+    # Check content type
     return 0 unless $up->headers->content_type && $up->headers->content_type eq 'application/json';
-
-    # Path-Traversal-Schutz
-    my $rel_path = File::Spec->abs2rel($dest, $jsonDir);
-    if ($rel_path =~ m{^\.\.}s) {
-        app->log->error("Path-Traversal-Versuch: $dest");
-        return 0;
-    }
 
     my $tmp = sprintf "%s/upload_%d_%d_%d", $tmpDir, $$, time, int(rand(1e6));
     eval {
-        ensure_dir($tmpDir) or die "tmpDir nicht vorhanden oder nicht beschreibbar";
-        $up->move_to($tmp) or die "move_to fehlgeschlagen: " . $up->error;
+        ensure_dir($tmpDir) or die "tmpDir not present or not writable";
+        $up->move_to($tmp) or die "move_to failed: " . $up->error;
         chmod_safe($tmp, $tmpFileMode);
 
-        ensure_dir(dirname($dest)) or die "Zielverzeichnis fehlt oder ist nicht beschreibbar";
-
-        # JSON validieren
-        my $json = do { local $/; open my $fh, '<', $tmp; <$fh> };
-        my $validator = JSON::Validator->new;
-        $validator->validate($json) or die "Ungültige JSON-Struktur: " . join(', ', @{$validator->errors});
-
+        ensure_dir(dirname($dest)) or die "Target directory missing or not writable";
         if (!rename $tmp, $dest) {
-            copy($tmp, $dest) or die "copy fehlgeschlagen: $!";
-            unlink $tmp or app->log->warn("Kann temporäre Datei nicht löschen: $tmp");
+            copy($tmp, $dest) or die "copy failed: $!";
+            unlink $tmp or app->log->warn("Could not delete temporary file: $tmp");
         }
 
         chmod_safe($dest, $fileModeDeploy);
         chown_safe($dest, $deployUID, $deployGID);
 
-        app->log->info("Upload gespeichert: $dest (Size: " . (-s $dest) . " bytes)");
+        app->log->info("Upload saved: " . basename($dest) . " (Size: " . (-s $dest) . " bytes)");
         1;
     } or do {
-        app->log->error("Upload fehlgeschlagen ($dest): $@");
+        app->log->error("Upload failed: $@");
         unlink $tmp if -e $tmp;
         return 0;
     };
     return 1;
 }
 
-# ---------- backups (ASYNCHRON) ----------
+# ---------- Backups (async) ----------
 sub create_file_backup {
     my ($kind, $source_file) = @_;
     return unless -f $source_file;
@@ -280,8 +251,8 @@ sub create_file_backup {
             my $ts   = localtime->strftime('%Y%m%d_%H%M%S');
             my $dest = File::Spec->catfile($backupDir, "${kind}_${ts}.json");
             eval {
-                ensure_dir($backupDir) or die "backupDir fehlt";
-                copy($source_file, $dest) or die "copy fehlgeschlagen: $!";
+                ensure_dir($backupDir) or die "backupDir missing";
+                copy($source_file, $dest) or die "copy failed: $!";
                 chmod_safe($dest, $fileModeService);
 
                 my @list = sort { $b cmp $a } bsd_glob("$backupDir/${kind}_*.json");
@@ -290,21 +261,20 @@ sub create_file_backup {
                     my $mtime = (stat($old))[9];
                     my $age_days = int(($now - $mtime) / 86400);
                     if ($age_days > $maxBackupAgeDays || @list > $maxBackups) {
-                        unlink $old or app->log->warn("Kann Backup nicht löschen $old: $!");
+                        unlink $old or app->log->warn("Could not delete backup: " . basename($old));
                     }
                 }
                 1;
-            } or app->log->error("Backup fehlgeschlagen: $@");
+            } or app->log->error("Backup failed: $@");
         },
         sub {
             my ($subprocess, $err) = @_;
             if ($err) {
-                app->log->error("Async Backup fehlgeschlagen: $err");
+                app->log->error("Async backup failed: $err");
             } else {
-                app->log->info("Async Backup erfolgreich: $source_file");
+                app->log->info("Async backup successful");
             }
-        },
-        30  # Timeout in Sekunden
+        }
     );
 }
 
@@ -327,13 +297,13 @@ sub client_ip {
     return $rip;
 }
 
-# ---------- hooks/auth ----------
+# ---------- Auth hooks ----------
 hook before_dispatch => sub {
     my $c = shift;
 
     my $ip = client_ip($c);
     unless (Net::CIDR::cidrlookup($ip, @acl_cidrs)) {
-        app->log->warn("Forbidden IP (keine Details)");
+        app->log->warn("Forbidden request (IP not allowed)");
         return fail_json($c, "Forbidden", 403);
     }
 
@@ -342,7 +312,7 @@ hook before_dispatch => sub {
     return fail_json($c, "Unauthorized: invalid API token", 401) unless secure_compare($hdr, $api_token);
 };
 
-# ---------- Cache-Invalidierung ----------
+# ---------- Cache invalidation ----------
 hook after_dispatch => sub {
     my $c = shift;
     if ($c->req->url->path =~ m{/autoreply/(server|user)/config$} && $c->req->method eq 'POST') {
@@ -350,19 +320,14 @@ hook after_dispatch => sub {
     }
 };
 
-# ---------- routes ----------
-sub handle_config_upload {
-    my ($c, $kind) = @_;
-    my $up = $c->req->upload('config') or return fail_json($c, "No config uploaded", 400);
-    my $f = File::Spec->catfile($kind eq 'server' ? $configDir : $jsonDir, "autoreply_${kind}.json");
-    create_file_backup($kind, $f) if -f $f;
-    atomic_upload($up, $f) or return fail_json($c, "Upload fehlgeschlagen", 500);
-    success_json($c, {});
-}
-
-post '/autoreply/:kind/config' => [kind => qr/server|user/] => sub {
+# ---------- Routes ----------
+post '/autoreply/server/config' => sub {
     my $c = shift;
-    handle_config_upload($c, $c->stash('kind'));
+    my $up = $c->req->upload('config') or return fail_json($c, "No config uploaded", 400);
+    my $f = File::Spec->catfile($configDir, 'autoreply_server.json');
+    create_file_backup('server', $f) if -f $f;
+    atomic_upload($up, $f) or return fail_json($c, "Upload failed", 500);
+    success_json($c, {});
 };
 
 get '/autoreply/server/config' => sub {
@@ -371,6 +336,15 @@ get '/autoreply/server/config' => sub {
     return fail_json($c, "Config not found", 404) unless -f $f;
     $c->res->headers->content_disposition('attachment; filename="autoreply_server.json"');
     $c->reply->file($f);
+};
+
+post '/autoreply/user/config' => sub {
+    my $c = shift;
+    my $up = $c->req->upload('config') or return fail_json($c, "No config uploaded", 400);
+    my $f = File::Spec->catfile($jsonDir, 'autoreply_user.json');
+    create_file_backup('user', $f) if -f $f;
+    atomic_upload($up, $f) or return fail_json($c, "Upload failed", 500);
+    success_json($c, {});
 };
 
 get '/autoreply/user/config' => sub {
@@ -411,7 +385,7 @@ get '/autoreply/backup/*filename' => sub {
 
 get '/autoreply/statslog' => sub {
     my $c = shift;
-    return fail_json($c, "Stats-Log not found", 404) unless -f $statslog;
+    return fail_json($c, "Stats log not found", 404) unless -f $statslog;
     chown_safe($statslog, $deployUID, $deployGID);
     $c->res->headers->content_disposition('attachment; filename="autoreply_stats.log"');
     $c->reply->file($statslog);
@@ -437,24 +411,24 @@ get '/health' => sub {
 
 any '/*whatever' => sub {
     my $c = shift;
-    fail_json($c, "Unbekannte Route: " . $c->req->method . " " . $c->req->url->path, 404);
+    fail_json($c, "Unknown route", 404);
 };
 
-# ---------- SSL-Prüfung ----------
+# ---------- SSL check ----------
 if ($Config->{ssl_enable}) {
-    my $ssl_cert = $Config->{ssl_cert_file} // die "ssl_cert_file fehlt in Config!";
-    my $ssl_key  = $Config->{ssl_key_file}  // die "ssl_key_file fehlt in Config!";
-    die "SSL-Zertifikat nicht lesbar: $ssl_cert\n" unless -r $ssl_cert;
-    die "SSL-Key nicht lesbar: $ssl_key\n"   unless -r $ssl_key;
-    die "SSL-Zertifikat ist leer: $ssl_cert\n" unless -s $ssl_cert;
-    die "SSL-Key ist leer: $ssl_key\n"   unless -s $ssl_key;
+    my $ssl_cert = $Config->{ssl_cert_file} // die "ssl_cert_file missing in config!";
+    my $ssl_key  = $Config->{ssl_key_file}  // die "ssl_key_file missing in config!";
+    die "SSL certificate not readable: $ssl_cert\n" unless -r $ssl_cert;
+    die "SSL key not readable: $ssl_key\n"   unless -r $ssl_key;
+    die "SSL certificate is empty: $ssl_cert\n" unless -s $ssl_cert;
+    die "SSL key is empty: $ssl_key\n"   unless -s $ssl_key;
 }
 
-# ---------- start ----------
+# ---------- Start ----------
 my $listen_addr = $Config->{listen} // '0.0.0.0:5000';
 my $listen_url = $Config->{ssl_enable}
     ? "https://$listen_addr?cert=$Config->{ssl_cert_file}&key=$Config->{ssl_key_file}"
     : "http://$listen_addr";
 
-app->log->info("App gestartet auf $listen_url");
+app->log->info("App started");
 app->start('daemon', '-l', $listen_url);
