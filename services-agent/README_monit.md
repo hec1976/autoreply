@@ -11,7 +11,7 @@ Diese Anleitung beschreibt die Monit-Überwachung für den `autoreply-agent`-Ser
 Erstelle die Datei `/etc/monit/conf.d/autoreply-agent.conf` mit folgendem Inhalt:
 
 ```monit
-check process autoreply-agent with pidfile /run/autoreply-agent.pid
+check process autoreply-agent with pidfile /run/autoreply-agent/autoreply-agent.pid
   group services
   start program = "/bin/systemctl start autoreply-agent.service"
   stop program = "/bin/systemctl stop autoreply-agent.service"
@@ -95,7 +95,7 @@ set mailserver localhost
 
 | Problem                          | Lösung                                                                 |
 |----------------------------------|------------------------------------------------------------------------|
-| Monit startet den Service nicht | Prüfe `pidfile` in der Konfiguration (`/run/autoreply-agent.pid`).     |
+| Monit startet den Service nicht | Prüfe `pidfile` in der Konfiguration (`/run/autoreply-agent/autoreply-agent.pid`).     |
 | Berechtigungsfehler              | Manuell korrigieren: `sudo chown autoreply:autoreply /opt/autoreply/script/json` |
 | Log-Datei nicht gefunden        | Prüfe Pfad in `autoreply_log` (`/var/log/mmbb/autoreply-agent.log`).    |
 
