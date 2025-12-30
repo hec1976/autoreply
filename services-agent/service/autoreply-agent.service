@@ -8,7 +8,12 @@ Type=simple
 User=autoreply
 Group=autoreply
 WorkingDirectory=/opt/autoreply/services-agent
+RuntimeDirectory=autoreply-agent
+RuntimeDirectoryMode=0755
+PIDFile=%t/autoreply-agent/autoreply-agent.pid
 ExecStart=/usr/bin/perl /opt/autoreply/services-agent/autoreply-agent.pl
+ExecStartPost=/bin/sh -c 'echo $MAINPID > %t/autoreply-agent/autoreply-agent.pid'
+ExecStopPost=/bin/sh -c 'rm -f %t/autoreply-agent/autoreply-agent.pid'
 EnvironmentFile=/opt/autoreply/env/autoreply-agent.env
 UMask=0007
 
@@ -40,8 +45,9 @@ BindPaths=/opt/autoreply
 # Schreibzugriff für den Service
 ReadWritePaths=/opt/autoreply/log      
 ReadWritePaths=/opt/autoreply/services-agent/tmp  
-ReadWritePaths=/opt/autoreply/script/json 
+ReadWritePaths=/opt/autoreply/script/json
 ReadWritePaths=/opt/autoreply/script/conf
+
 
 # Sandboxing
 NoNewPrivileges=yes
@@ -64,6 +70,7 @@ KeyringMode=private
 # Caps minimal und korrekt
 AmbientCapabilities=CAP_CHOWN CAP_FOWNER
 CapabilityBoundingSet=CAP_CHOWN CAP_FOWNER
+
 
 # Logging
 StandardOutput=journal
