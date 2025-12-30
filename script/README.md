@@ -115,7 +115,7 @@ main.cf (Auszug):
 ```conf
 # Beispiel Transport
 autoreply_filter unix  -  n  n  -  -  pipe
-  flags=Rq user=autoreply argv=/usr/bin/python3 /opt/mmbb_script/autoreply/autoreply.py ${sender} ${recipient}
+  flags=Rq user=autoreply argv=/usr/bin/python3 /opt/autoreply/script/autoreply.py ${sender} ${recipient}
 ```
 
 Je nach Setup kann man auch mehrere Empfaenger uebergeben. Das Script erkennt im bcc Mode den tatsaechlichen Empfaenger aus Delivered To oder X Original To oder To.
