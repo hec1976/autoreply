@@ -4,7 +4,7 @@
 Autoreply-Mailfilter für Postfix
 
 Liest Mails von STDIN, prüft Filter- und Blacklist-Regeln und sendet ggf. eine
-automatische Antwort gemäß Nutzer- und Server-Konfiguration.
+automatische Antwort gemäss Nutzer- und Server-Konfiguration.
 
 Konfigurationsdateien (Standardpfade):
 - /opt/mmbb_script/autoreply/config/autoreply_server.json
@@ -209,6 +209,19 @@ def _atomic_write(path: str, data: str) -> None:
         os.fsync(fh.fileno())
     os.replace(tmp, path)
 
+def _ensure_file_mode(path: str, mode: int = 0o660) -> None:
+    """
+    Erzwingt Dateirechte (z.B. Stats Log soll 660 sein).
+    Korrigiert auch bestehende Dateien, die heute evtl. 600 haben.
+    """
+    try:
+        if os.path.exists(path):
+            cur = os.stat(path).st_mode & 0o777
+            if cur != mode:
+                os.chmod(path, mode)
+    except Exception as e:
+        log_error(f"CHMOD_FAIL file={path} mode={oct(mode)} err={e}")
+
 def log(message: str) -> None:
     if logging_enabled:
         try:
@@ -271,6 +284,10 @@ def _rotate_stats_monthly(stats_path: str) -> None:
                 i += 1
 
         os.rename(stats_path, rotated)
+
+        # rotierte Datei ebenfalls 660 erzwingen
+        _ensure_file_mode(rotated, 0o660)
+
     except Exception as e:
         try:
             print(f"Statistik-Rotation fehlgeschlagen: {e}", file=sys.stderr)
@@ -285,6 +302,10 @@ def log_stat(event: str, sender: str, recipient: str, subject: str, template: st
         ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         with open(STATS_PATH, 'a+', encoding='utf-8') as f:
             f.write(f"{ts};{event};{sender};{recipient};{subject};{template}\n")
+
+        # Stats Log soll 660 sein (heute oft 600, daher korrigieren)
+        _ensure_file_mode(STATS_PATH, 0o660)
+
     except Exception as e:
         print(f"Statistik-Log-Fehler: {e}", file=sys.stderr)
 
@@ -475,6 +496,17 @@ def encode_address(addr: str) -> str:
     if name:
         return formataddr((str(Header(name, 'utf-8')), email))
     return email
+
+def _norm_addr(s: str) -> str:
+    """
+    Normalisiert eine Adresse fuer stabile Vergleiche.
+    Entfernt Display-Name Anteile (Name <addr>), trimmt und macht lower().
+    """
+    if not s:
+        return ""
+    _name, addr = parseaddr(str(s))
+    addr = (addr or s).strip().lower()
+    return addr
 
 def _extract_body_text(msg: Message) -> str:
     if msg.is_multipart():
@@ -864,15 +896,27 @@ def autoreply(sender: str, recipients: List[str], original_msg: Message,
               original_id: Optional[str], server_settings: dict, user_settings: dict) -> None:
     rules = user_settings.get('autoreply') or []
 
+    # Recipients 1x normalisieren (damit Vergleich stabil ist)
+    rcpt_norm: List[str] = []
+    for r in (recipients or []):
+        rn = _norm_addr(r)
+        if rn:
+            rcpt_norm.append(rn)
+
     for recipient in rules:
         if 'email' in recipient:
             emails = recipient['email']
             if not isinstance(emails, list):
                 emails = [emails]
             for email in emails:
-                for rcpt in recipients:
-                    if email == rcpt:
-                        send_autoreply_email(sender, email, recipient, original_msg, original_id, server_settings, user_settings)
+                e_norm = _norm_addr(email)
+                if not e_norm:
+                    continue
+                for idx, rcpt in enumerate(recipients or []):
+                    r_norm = rcpt_norm[idx] if idx < len(rcpt_norm) else _norm_addr(rcpt)
+                    if e_norm == r_norm:
+                        # wichtig: effektiven rcpt uebergeben (nicht den Config-String)
+                        send_autoreply_email(sender, rcpt, recipient, original_msg, original_id, server_settings, user_settings)
                         return
 
     for recipient in rules:
@@ -918,7 +962,7 @@ def main() -> None:
         logging_enabled = bool(server_settings.get("logging", False))
     else:
         logging_enabled = bool(_conf.get("LOGGING_ENABLED_OVERRIDE"))
-    
+
     global LIMIT_PRUNE_SEC
     if _conf.get("LIMIT_PRUNE_SEC_OVERRIDE") is None:
         LIMIT_PRUNE_SEC = _compute_limit_prune_sec(user_settings)
@@ -960,4 +1004,3 @@ if __name__ == '__main__':
         sys.exit(0)
     except BaseException as exc:
         log_error(f"UNCAUGHT {exc.__class__.__name__} {traceback.format_exc()}")
-        raise
