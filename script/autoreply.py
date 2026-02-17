@@ -29,6 +29,7 @@ import os.path
 import re
 import traceback
 import fcntl
+import csv 
 
 from contextlib import contextmanager
 from email.message import Message, EmailMessage
@@ -167,6 +168,7 @@ def log_stat(event: str, sender: str, recipient: str, subject: str, template: st
 
         ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
+        # Daten für die CSV-Zeile vorbereiten
         row = [ts, event, sender or "", recipient or "", subject or "", template or ""]
         
         # Datei im Append-Modus öffnen
@@ -174,10 +176,12 @@ def log_stat(event: str, sender: str, recipient: str, subject: str, template: st
             w = csv.writer(f, delimiter=';', quoting=csv.QUOTE_MINIMAL)
             w.writerow(row)
         
-        # Berechtigungen auf 660 setzen (Oktal-Schreibweise 0o660)
+        # Berechtigungen auf 660 setzen (rw-rw----)
+        # Das stellt sicher, dass Gruppe und User schreiben/lesen dürfen.
         os.chmod(STATS_PATH, 0o660)
         
     except Exception as e:
+        # Fehler beim Statistik-Loggen schreiben wir ins Standard-Error
         print(f"Statistik-Log-Fehler: {e}", file=sys.stderr)
 
 def log_blocked_autoreply(message: Message, reason: str) -> None:
@@ -909,4 +913,5 @@ if __name__ == '__main__':
     except BaseException as exc:
         log_error(f"UNCAUGHT {exc.__class__.__name__} {traceback.format_exc()}")
         raise
+
 
