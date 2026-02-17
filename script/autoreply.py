@@ -166,8 +166,17 @@ def log_stat(event: str, sender: str, recipient: str, subject: str, template: st
         _rotate_stats_monthly(STATS_PATH)
 
         ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        with open(STATS_PATH, 'a+', encoding='utf-8') as f:
-            f.write(f"{ts};{event};{sender};{recipient};{subject};{template}\n")
+
+        row = [ts, event, sender or "", recipient or "", subject or "", template or ""]
+        
+        # Datei im Append-Modus öffnen
+        with open(STATS_PATH, 'a', encoding='utf-8', newline='') as f:
+            w = csv.writer(f, delimiter=';', quoting=csv.QUOTE_MINIMAL)
+            w.writerow(row)
+        
+        # Berechtigungen auf 660 setzen (Oktal-Schreibweise 0o660)
+        os.chmod(STATS_PATH, 0o660)
+        
     except Exception as e:
         print(f"Statistik-Log-Fehler: {e}", file=sys.stderr)
 
@@ -900,3 +909,4 @@ if __name__ == '__main__':
     except BaseException as exc:
         log_error(f"UNCAUGHT {exc.__class__.__name__} {traceback.format_exc()}")
         raise
+
