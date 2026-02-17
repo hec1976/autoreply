@@ -29,7 +29,7 @@ import os.path
 import re
 import traceback
 import fcntl
-import csv 
+import csv
 
 from contextlib import contextmanager
 from email.message import Message, EmailMessage
@@ -38,32 +38,27 @@ from email.utils import make_msgid, formataddr, parseaddr, getaddresses
 from email.header import Header, decode_header
 from subprocess import Popen, PIPE
 from datetime import datetime
-from typing import Dict, Any, List, Optional, Pattern
+from typing import Dict, List, Optional, Pattern
 
-# -----------------------------------------------------------------------------
-# Pfade und globale Flags
-# -----------------------------------------------------------------------------
+
 SERVER_CONFIG_PATH = '/opt/mmbb_script/autoreply/config/autoreply_server.json'
-USER_CONFIG_PATH   = '/opt/mmbb_script/autoreply/json/autoreply_user.json'
+USER_CONFIG_PATH = '/opt/mmbb_script/autoreply/json/autoreply_user.json'
 
-LOG_PATH   = '/var/log/mmbb/autoreply.log'
+LOG_PATH = '/var/log/mmbb/autoreply.log'
 STATS_PATH = '/opt/mmbb_script/autoreply/log/autoreply_stats.log'
 LIMIT_PATH = '/opt/mmbb_script/autoreply/log/autoreply_limit.json'
-
-# Prozessweiter Lock fuer parallele Instanzen
 LIMIT_LOCK_PATH = LIMIT_PATH + ".lock"
 
-# Prune Fenster fuer Limits (wird in main() berechnet)
 LIMIT_PRUNE_SEC = 0
-
 logging_enabled = False
 
-# -----------------------------------------------------------------------------
-# Regex-Cache
-# -----------------------------------------------------------------------------
+
 _REGEX_CACHE: Dict[str, Pattern] = {}
+
+
 def _compile(pat: str) -> Pattern:
     return _REGEX_CACHE.setdefault(pat, re.compile(pat))
+
 
 def _match_any(patterns, text: str) -> bool:
     if not text:
@@ -76,13 +71,12 @@ def _match_any(patterns, text: str) -> bool:
         log_error(f"REGEX_FAIL patterns={patterns} err={e}")
         return False
 
-# -----------------------------------------------------------------------------
-# Datei und Log-Helfer
-# -----------------------------------------------------------------------------
+
 def _ensure_dir_for(path: str) -> None:
     d = os.path.dirname(path)
     if d and not os.path.isdir(d):
         os.makedirs(d, mode=0o750, exist_ok=True)
+
 
 def _atomic_write(path: str, data: str) -> None:
     _ensure_dir_for(path)
@@ -93,21 +87,20 @@ def _atomic_write(path: str, data: str) -> None:
         os.fsync(fh.fileno())
     os.replace(tmp, path)
 
+
 def log(message: str) -> None:
-    if logging_enabled:
-        try:
-            _ensure_dir_for(LOG_PATH)
-            ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            with open(LOG_PATH, 'a+', encoding='utf-8') as f:
-                f.write(f"{ts}: {message}\n")
-        except Exception as e:
-            print(f"Log-Fehler: {e}", file=sys.stderr)
+    if not logging_enabled:
+        return
+    try:
+        _ensure_dir_for(LOG_PATH)
+        ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        with open(LOG_PATH, 'a+', encoding='utf-8') as f:
+            f.write(f"{ts}: {message}\n")
+    except Exception as e:
+        print(f"Log-Fehler: {e}", file=sys.stderr)
+
 
 def log_error(message: str) -> None:
-    """
-    Fehler immer loggen (auch wenn logging_enabled = False),
-    damit Monit nur Fehler ueberwachen kann.
-    """
     try:
         _ensure_dir_for(LOG_PATH)
         ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -121,13 +114,8 @@ def log_error(message: str) -> None:
     except Exception:
         pass
 
+
 def _rotate_stats_monthly(stats_path: str) -> None:
-    """
-    Aktiver Name bleibt gleich (autoreply_stats.log).
-    Beim Monatswechsel wird die bestehende Datei umbenannt nach:
-      autoreply_stats_YYYY-MM.log
-    Danach entsteht automatisch wieder eine neue autoreply_stats.log.
-    """
     try:
         if not os.path.isfile(stats_path):
             return
@@ -161,28 +149,27 @@ def _rotate_stats_monthly(stats_path: str) -> None:
         except Exception:
             pass
 
+
 def log_stat(event: str, sender: str, recipient: str, subject: str, template: str) -> None:
     try:
         _ensure_dir_for(STATS_PATH)
         _rotate_stats_monthly(STATS_PATH)
 
         ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
-        # Daten für die CSV-Zeile vorbereiten
         row = [ts, event, sender or "", recipient or "", subject or "", template or ""]
-        
-        # Datei im Append-Modus öffnen
+
         with open(STATS_PATH, 'a', encoding='utf-8', newline='') as f:
             w = csv.writer(f, delimiter=';', quoting=csv.QUOTE_MINIMAL)
             w.writerow(row)
-        
-        # Berechtigungen auf 660 setzen (rw-rw----)
-        # Das stellt sicher, dass Gruppe und User schreiben/lesen dürfen.
-        os.chmod(STATS_PATH, 0o660)
-        
+
+        try:
+            os.chmod(STATS_PATH, 0o660)
+        except Exception:
+            pass
+
     except Exception as e:
-        # Fehler beim Statistik-Loggen schreiben wir ins Standard-Error
         print(f"Statistik-Log-Fehler: {e}", file=sys.stderr)
+
 
 def log_blocked_autoreply(message: Message, reason: str) -> None:
     log_stat(
@@ -193,9 +180,7 @@ def log_blocked_autoreply(message: Message, reason: str) -> None:
         reason
     )
 
-# -----------------------------------------------------------------------------
-# Limits Lock (prozessweit)
-# -----------------------------------------------------------------------------
+
 @contextmanager
 def _limits_flock():
     _ensure_dir_for(LIMIT_LOCK_PATH)
@@ -209,11 +194,8 @@ def _limits_flock():
         finally:
             fh.close()
 
+
 def _compute_limit_prune_sec(user_settings: dict) -> int:
-    """
-    Aufraeumfenster basiert auf groesstem reply_period_hours aus allen Regeln.
-    Entfernt nur Eintraege, die fuer kein konfiguriertes Fenster mehr relevant sind.
-    """
     mx = 24
     try:
         rules = user_settings.get("autoreply") or []
@@ -227,6 +209,7 @@ def _compute_limit_prune_sec(user_settings: dict) -> int:
     except Exception:
         pass
     return int(mx) * 3600
+
 
 def _prune_limits(limits: dict, max_age_sec: int) -> dict:
     if not isinstance(limits, dict) or max_age_sec <= 0:
@@ -261,19 +244,19 @@ def _prune_limits(limits: dict, max_age_sec: int) -> dict:
 
     return out
 
-# -----------------------------------------------------------------------------
-# JSON und Limits
-# -----------------------------------------------------------------------------
+
 def load_json(path: str, missing_message: str) -> dict:
     if not os.path.isfile(path):
         print(missing_message)
         sys.exit(1)
     try:
         with open(path, 'r', encoding='utf-8') as json_file:
-            return json.load(json_file)
+            data = json.load(json_file)
+        return data if isinstance(data, dict) else {}
     except Exception as e:
         print(f"Fehler beim Lesen von {path}: {e}")
         sys.exit(1)
+
 
 def load_limits() -> dict:
     if not os.path.isfile(LIMIT_PATH):
@@ -285,29 +268,22 @@ def load_limits() -> dict:
     except Exception:
         return {}
 
+
 def save_limits(limits: dict) -> None:
     try:
         _atomic_write(LIMIT_PATH, json.dumps(limits, ensure_ascii=False, indent=2))
     except Exception as e:
         log_error(f"LIMIT_SAVE_FAIL err={e}")
 
-# -----------------------------------------------------------------------------
-# Address Normalisierung (wichtig fuer BCC Mode und Rule Matching)
-# -----------------------------------------------------------------------------
+
 def normalize_email(raw: str) -> str:
-    """
-    Normalisiert eine Adresse auf reine Mailbox (lowercase).
-    Beispiele:
-      "TEST <a@a.ch>" -> "a@a.ch"
-      "<a@a.ch>"      -> "a@a.ch"
-      "a@a.ch"        -> "a@a.ch"
-    """
     if not raw:
         return ""
     raw = str(raw).strip()
     _, addr = parseaddr(raw)
     addr = (addr or "").strip().strip("<>").lower()
     return addr
+
 
 def normalize_email_list(items: List[str]) -> List[str]:
     out: List[str] = []
@@ -324,9 +300,7 @@ def normalize_email_list(items: List[str]) -> List[str]:
             seen.add(a)
     return uniq
 
-# -----------------------------------------------------------------------------
-# Limits pro Absender und Empfaenger
-# -----------------------------------------------------------------------------
+
 def is_limit_reached(recipient: str, sender: str, max_replies: int, period_hours: int) -> bool:
     recipient = normalize_email(recipient)
     sender = normalize_email(sender)
@@ -357,6 +331,7 @@ def is_limit_reached(recipient: str, sender: str, max_replies: int, period_hours
 
         return len(recent_times) >= int(max_replies)
 
+
 def register_autoreply(recipient: str, sender: str) -> None:
     recipient = normalize_email(recipient)
     sender = normalize_email(sender)
@@ -377,15 +352,14 @@ def register_autoreply(recipient: str, sender: str) -> None:
         limits[recipient] = user_limits
         save_limits(limits)
 
-# -----------------------------------------------------------------------------
-# Mail und Header Utilities
-# -----------------------------------------------------------------------------
+
 def replace_placeholders(text: str, context: dict) -> str:
     if not isinstance(text, str):
         return ""
     for key, value in context.items():
         text = text.replace(key, value or '')
     return text
+
 
 def decode_header_to_unicode(header_value: Optional[str]) -> str:
     if not header_value:
@@ -402,14 +376,17 @@ def decode_header_to_unicode(header_value: Optional[str]) -> str:
             out.append(fragment)
     return ''.join(out)
 
+
 def get_decoded_header(msg: Message, name: str, fallback: str = '') -> str:
     return decode_header_to_unicode(msg.get(name, fallback))
+
 
 def encode_address(addr: str) -> str:
     name, email = parseaddr(addr)
     if name:
         return formataddr((str(Header(name, 'utf-8')), email))
     return email
+
 
 def _extract_body_text(msg: Message) -> str:
     if msg.is_multipart():
@@ -431,21 +408,13 @@ def _extract_body_text(msg: Message) -> str:
     payload = msg.get_payload(decode=True) or b""
     return payload.decode(msg.get_content_charset() or "utf-8", errors="replace")
 
-# -----------------------------------------------------------------------------
-# Plaintext Cleanup (Outlook Winkelklammer Links)
-# -----------------------------------------------------------------------------
+
 _RE_ANGLE_URL = re.compile(r'(?P<label>[^\n<>]{2,}?)<(?P<url>https?://[^>\s]+)>')
 _RE_MAILTO = re.compile(r'(?i)<mailto:([^>\s]+)>')
 _RE_BARE_ANGLE_URL = re.compile(r'<(https?://[^>\s]+)>')
 
+
 def _cleanup_plaintext(s: str) -> str:
-    """
-    Bereinigt Outlook und Exchange Klartext Links.
-    Beispiele:
-      Text<https://example>  -> Text (https://example)
-      <https://example>      -> (https://example)
-      mail@x<mailto:mail@x>  -> mail@x
-    """
     if not s:
         return ""
 
@@ -459,12 +428,9 @@ def _cleanup_plaintext(s: str) -> str:
     s = _RE_ANGLE_URL.sub(_repl, s)
     s = _RE_BARE_ANGLE_URL.sub(lambda m: f"({m.group(1)})", s)
     s = _RE_MAILTO.sub("", s)
-
     return s.strip()
 
-# -----------------------------------------------------------------------------
-# Filterlogik (unterstuetzt header_allow als Liste ODER Dict)
-# -----------------------------------------------------------------------------
+
 def blocked_by_filters(msg: Message, user_cfg: dict) -> bool:
     cfg = user_cfg.get("filters", {}) or {}
 
@@ -489,22 +455,19 @@ def blocked_by_filters(msg: Message, user_cfg: dict) -> bool:
     body = _extract_body_text(msg)
     if _match_any(cfg.get("body_block", []), body):
         return True
+
     body_allow = cfg.get("body_allow", [])
     if body_allow and not _match_any(body_allow, body):
         return True
 
     return False
 
-# -----------------------------------------------------------------------------
-# Body Aufloesung: INLINE ONLY
-# -----------------------------------------------------------------------------
+
 def resolve_body_content(recipient_config: dict) -> str:
     body = recipient_config.get('body', '')
     return body if isinstance(body, str) else ''
 
-# -----------------------------------------------------------------------------
-# Blacklist und Header Checks
-# -----------------------------------------------------------------------------
+
 def is_blacklisted(sender: str, entry_blacklist=None, user_blacklist=None) -> bool:
     s = normalize_email(sender)
     sender_domain = s.split('@', 1)[-1] if '@' in s else s
@@ -519,13 +482,15 @@ def is_blacklisted(sender: str, entry_blacklist=None, user_blacklist=None) -> bo
                 return True
     return False
 
+
 def check_noreply(header: str) -> bool:
     addr = normalize_email(header)
     localpart = addr.split('@', 1)[0] if '@' in addr else addr
     name = (localpart or '').lower().replace('-', '').replace('_', '').replace('.', '')
     return 'noreply' in name or 'donotreply' in name or 'dontreply' in name
 
-def check_autoreply(message: Message, original_id: Optional[str], server_settings: dict) -> bool:
+
+def check_autoreply(message: Message, original_id: Optional[str], server_settings: dict, envelope_from_raw: str) -> bool:
     checks = server_settings.get("autoreply_checks", {}) or {}
     log(f"Pruefe auf Autoreply-Header fuer ID {original_id}")
 
@@ -541,7 +506,7 @@ def check_autoreply(message: Message, original_id: Optional[str], server_setting
             xars = (message.get('X-Auto-Response-Suppress') or '')
             xars_list = [v.strip() for v in xars.split(',') if v.strip()]
             if any(v in ('DR', 'AutoReply', 'All', 'OOF') for v in xars_list):
-                log("X-Auto-Response-Suppress (DR/AutoReply/All/OOF), keine Autoreply")
+                log("X-Auto-Response-Suppress gesetzt, keine Autoreply")
                 log_blocked_autoreply(message, 'x_auto_response_suppress')
                 return True
 
@@ -570,7 +535,7 @@ def check_autoreply(message: Message, original_id: Optional[str], server_setting
                 return True
 
         if checks.get("empty_envelope_from", True):
-            if hasattr(message, 'envelope_from') and (not message.envelope_from or message.envelope_from.strip() == ''):
+            if not (envelope_from_raw or "").strip() or normalize_email(envelope_from_raw) == "":
                 log("Envelope-From leer (Bounce/NDR), keine Autoreply")
                 log_blocked_autoreply(message, 'empty_envelope_from')
                 return True
@@ -589,7 +554,7 @@ def check_autoreply(message: Message, original_id: Optional[str], server_setting
 
         if checks.get("noreply", True):
             if check_noreply(message.get('From', '')):
-                log(f"Absender ist NoReply-Adresse: {message.get('From')}, keine Autoreply")
+                log("Absender ist NoReply-Adresse, keine Autoreply")
                 log_blocked_autoreply(message, 'noreply')
                 return True
 
@@ -600,9 +565,7 @@ def check_autoreply(message: Message, original_id: Optional[str], server_setting
     log(f"Keine Autoreply-Header gefunden fuer ID {original_id}, Autoreply moeglich")
     return False
 
-# -----------------------------------------------------------------------------
-# Empfaenger Ermittlung und Re Injection
-# -----------------------------------------------------------------------------
+
 def _first_email_from_header(raw: str) -> Optional[str]:
     if not raw:
         return None
@@ -611,11 +574,8 @@ def _first_email_from_header(raw: str) -> Optional[str]:
         return None
     return normalize_email(addrs[0])
 
+
 def get_recipient_address(message: Message, recipients: List[str]) -> Optional[str]:
-    """
-    Im BCC Mode die echte Zieladresse aus Headern holen.
-    Fallback ist die erste Adresse aus der argv Liste (raw, nicht normalisiert).
-    """
     for header in ('Delivered-To', 'X-Original-To', 'To'):
         val = message.get(header)
         email = _first_email_from_header(val) if val else None
@@ -625,9 +585,10 @@ def get_recipient_address(message: Message, recipients: List[str]) -> Optional[s
         return normalize_email(recipients[0])
     return None
 
+
 def reinject_email(message_bytes: bytes, sender: str, recipients: List[str], original_id: Optional[str]) -> None:
     recipients_joined = ','.join(recipients)
-    log(f'Re-injecting Original-Mail (ID: {original_id}) an: {recipients_joined}')
+    log(f"Re-injecting Original-Mail (ID: {original_id}) an: {recipients_joined}")
     try:
         process = Popen(
             ['/usr/sbin/sendmail', '-f', sender, '-G', '-oi', recipients_joined],
@@ -637,9 +598,7 @@ def reinject_email(message_bytes: bytes, sender: str, recipients: List[str], ori
     except Exception as e:
         log_error(f"REINJECT_FAIL id={original_id} err={e}")
 
-# -----------------------------------------------------------------------------
-# Mail erzeugen und versenden
-# -----------------------------------------------------------------------------
+
 def _html_to_text(html: str) -> str:
     if not html:
         return ''
@@ -648,6 +607,7 @@ def _html_to_text(html: str) -> str:
     txt = re.sub(r'(?is)</p\s*>', '\n\n', txt)
     txt = re.sub(r'(?is)<.*?>', '', txt)
     return re.sub(r'\n{3,}', '\n\n', txt).strip()
+
 
 def generate_email(sender: str, recipient, original_id: Optional[str], replyto: str,
                    subject: str, body: str, html: bool,
@@ -697,15 +657,16 @@ def generate_email(sender: str, recipient, original_id: Optional[str], replyto: 
             log_error(f"ATTACH_FAIL file={attachment_path} err={e}")
     return message
 
+
 def send_email(message: EmailMessage, server_settings: dict) -> None:
     try:
         smtp_host = server_settings.get('SMTP', 'localhost')
         smtp_port = int(server_settings.get('port', 25))
-        use_ssl   = bool(server_settings.get('ssl'))
-        use_tls   = bool(server_settings.get('starttls'))
-        use_auth  = bool(server_settings.get('smtpauth'))
-        username  = server_settings.get('username', '')
-        password  = server_settings.get('password', '')
+        use_ssl = bool(server_settings.get('ssl'))
+        use_tls = bool(server_settings.get('starttls'))
+        use_auth = bool(server_settings.get('smtpauth'))
+        username = server_settings.get('username', '')
+        password = server_settings.get('password', '')
 
         context = ssl.create_default_context()
 
@@ -724,38 +685,36 @@ def send_email(message: EmailMessage, server_settings: dict) -> None:
     except Exception as e:
         log_error(f"SMTP_FAIL to={message.get('To','')} subj={message.get('Subject','')} err={e}")
 
-# -----------------------------------------------------------------------------
-# Autoreply senden
-# -----------------------------------------------------------------------------
+
 def send_autoreply_email(sender: str, recipient_email: str, recipient_config: dict,
                          original_msg: Message, original_id: Optional[str],
                          server_settings: dict, user_settings: dict) -> None:
     sender = normalize_email(sender)
     recipient_email = normalize_email(recipient_email)
 
-    log('Autoreply ausgeloest')
-    log(f'Absender: {sender}')
-    log(f'Message-Id: {original_id}')
-    log(f'Regel-Empfaenger: {recipient_email}')
+    log("Autoreply ausgeloest")
+    log(f"Absender: {sender}")
+    log(f"Message-Id: {original_id}")
+    log(f"Regel-Empfaenger: {recipient_email}")
 
     if blocked_by_filters(original_msg, user_settings):
         subject_log = get_decoded_header(original_msg, 'Subject')
         log(f"Header/Body-Filter ausgeloest, keine Autoreply an {sender}.")
-        log_stat('filter_skip', sender, recipient_email, subject_log, '-')
+        log_stat('filter_skip', sender, recipient_email, subject_log, '')
         return
 
     entry_blacklist = recipient_config.get('blacklist', [])
-    user_blacklist  = user_settings.get('blacklist', [])
+    user_blacklist = user_settings.get('blacklist', [])
     if is_blacklisted(sender, entry_blacklist, user_blacklist):
-        log(f'Sender {sender} ist geblacklistet, keine Autoreply.')
+        log(f"Sender {sender} ist geblacklistet, keine Autoreply.")
         return
 
-    max_replies  = int(recipient_config.get('max_replies_per_sender', 3))
+    max_replies = int(recipient_config.get('max_replies_per_sender', 3))
     period_hours = int(recipient_config.get('reply_period_hours', 24))
     if is_limit_reached(recipient_email, sender, max_replies, period_hours):
         subject_log = get_decoded_header(original_msg, 'Subject')
         log(f"Autoreply-Limit erreicht fuer {recipient_email} an {sender}: max {max_replies} pro {period_hours}h.")
-        log_stat('autoreply_limit', sender, recipient_email, subject_log, '-')
+        log_stat('autoreply_limit', sender, recipient_email, subject_log, '')
         return
 
     if recipient_email and sender and recipient_email == sender:
@@ -772,6 +731,9 @@ def send_autoreply_email(sender: str, recipient_email: str, recipient_config: di
         orig_body = _extract_body_text(original_msg)
         orig_body = _cleanup_plaintext(orig_body)
 
+        if len(orig_body) > 2000:
+            orig_body = orig_body[:2000] + "\n\n[... gekuerzt ...]"
+
         placeholders = {
             '{ORIGINAL_DESTINATION}': recipient_email,
             '{ORIGINAL_SUBJECT}': get_decoded_header(original_msg, 'Subject'),
@@ -781,7 +743,7 @@ def send_autoreply_email(sender: str, recipient_email: str, recipient_config: di
         }
 
         subject = replace_placeholders(subject_template, placeholders)
-        body    = replace_placeholders(body_raw, placeholders)
+        body = replace_placeholders(body_raw, placeholders)
 
         message = generate_email(
             from_field,
@@ -802,12 +764,11 @@ def send_autoreply_email(sender: str, recipient_email: str, recipient_config: di
             subject,
             str(recipient_config.get('email', recipient_config.get('domain', '')))
         )
+
     except Exception as e:
         log_error(f"AUTOREPLY_SEND_FAIL id={original_id} rcpt={recipient_email} sender={sender} err={e}")
 
-# -----------------------------------------------------------------------------
-# Regel Matching (normalisiert, damit BCC Mode sauber matcht)
-# -----------------------------------------------------------------------------
+
 def autoreply(sender: str, recipients: List[str], original_msg: Message,
               original_id: Optional[str], server_settings: dict, user_settings: dict) -> None:
     rules = user_settings.get('autoreply') or []
@@ -832,7 +793,7 @@ def autoreply(sender: str, recipients: List[str], original_msg: Message,
             domains = recipient['domain']
             if not isinstance(domains, list):
                 domains = [domains]
-            domains_n = [str(d).strip().lower() for d in domains if isinstance(d, (str,)) and str(d).strip()]
+            domains_n = [str(d).strip().lower() for d in domains if isinstance(d, str) and str(d).strip()]
 
             for rcpt in rcpts_n:
                 if '@' not in rcpt:
@@ -842,13 +803,11 @@ def autoreply(sender: str, recipients: List[str], original_msg: Message,
                     send_autoreply_email(sender_n, rcpt, recipient, original_msg, original_id, server_settings, user_settings)
                     return
 
-# -----------------------------------------------------------------------------
-# Main
-# -----------------------------------------------------------------------------
+
 def main() -> None:
     if len(sys.argv) < 2 or sys.argv[1] in ('help', '--help', '-h'):
         print(
-            "Verwendung (ueber Filter/pipe typischerweise mit Envelope-Sender + Empfaenger):\n"
+            "Verwendung:\n"
             "  python3 autoreply.py <sender> <rcpt1> [rcpt2 ...]\n\n"
             "Konfiguration:\n"
             f"  Server: {SERVER_CONFIG_PATH}\n"
@@ -858,16 +817,16 @@ def main() -> None:
 
     server_settings = load_json(
         SERVER_CONFIG_PATH,
-        "Fehler: autoreply_server.json fehlt!\nBitte anlegen."
+        "Fehler: autoreply_server.json fehlt! Bitte anlegen."
     )
     user_settings = load_json(
         USER_CONFIG_PATH,
-        "Fehler: autoreply_user.json fehlt!\nBitte anlegen."
+        "Fehler: autoreply_user.json fehlt! Bitte anlegen."
     )
 
     global logging_enabled
     logging_enabled = bool(server_settings.get('logging', False))
-    log('autoreply.py wurde gestartet')
+    log("autoreply.py wurde gestartet")
 
     global LIMIT_PRUNE_SEC
     LIMIT_PRUNE_SEC = _compute_limit_prune_sec(user_settings)
@@ -883,10 +842,9 @@ def main() -> None:
     mail_bytes = sys.stdin.buffer.read()
     original_msg = message_from_bytes(mail_bytes)
 
-    try:
-        original_id = (original_msg['Message-ID']).replace('\r', '').replace('\n', '').replace(' ', '')
-    except Exception:
-        original_id = None
+    original_id = original_msg.get('Message-ID')
+    if original_id:
+        original_id = str(original_id).replace('\r', '').replace('\n', '').replace(' ', '')
 
     if integration_mode != "bcc":
         recipients = recipient_list
@@ -902,8 +860,9 @@ def main() -> None:
             recipients = recipient_list
             log(f"Integration Mode: BCC, kein Empfaenger im Header gefunden, nutze Empfaengerliste: {recipient_list_raw}")
 
-    if not check_autoreply(original_msg, original_id or 'ohne-Message-ID', server_settings):
+    if not check_autoreply(original_msg, original_id or 'ohne-Message-ID', server_settings, sender_raw):
         autoreply(sender, recipients, original_msg, original_id, server_settings, user_settings)
+
 
 if __name__ == '__main__':
     try:
@@ -913,5 +872,3 @@ if __name__ == '__main__':
     except BaseException as exc:
         log_error(f"UNCAUGHT {exc.__class__.__name__} {traceback.format_exc()}")
         raise
-
-
