@@ -37,7 +37,7 @@ from email import message_from_bytes
 from email.header import Header, decode_header
 from email.message import Message, EmailMessage
 from email.utils import formataddr, getaddresses, make_msgid, parseaddr
-from subprocess import Popen, PIPE, run
+from subprocess import Popen, PIPE
 from typing import Dict, List, Optional, Pattern, Any, Tuple
 
 
@@ -542,8 +542,6 @@ def log_stat(event: str, sender: str, recipient: str, subject: str, template: st
             _rotate_stats_monthly(STATS_PATH)
 
             ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            # Hinweis: subject/template koennen User-Content enthalten (Placeholder aus Original-Mail),
-            # csv.writer quotet sauber, trotzdem ist das bewusst so.
             row = [ts, event, sender or "", recipient or "", subject or "", template or ""]
             with open(STATS_PATH, 'a', encoding='utf-8', newline='') as f:
                 w = csv.writer(f, delimiter=';', quoting=csv.QUOTE_MINIMAL)
@@ -782,39 +780,11 @@ def generate_email(
 
 
 # =========================
-# SMTP v2.6: MX first (optional), sonst A/AAAA Failover ueber alle IPs
-# timeout_sec und mx_first sind optional in config, Default wird genutzt
+# SMTP v2.6: Failover basiert auf dem Haupt FQDN (A/AAAA)
+# - Es wird der FQDN aus server_settings["SMTP"] aufgeloest
+# - Alle IPs (A und AAAA) werden nacheinander probiert
+# - timeout_sec ist optional, Default 8
 # =========================
-
-def _resolve_mx_hosts_via_dig(name: str) -> List[str]:
-    """
-    MX via dig abfragen und nach Preference sortieren (kleinste Zahl zuerst).
-    Falls dig fehlt oder keine MX vorhanden sind, kommt [] zurueck.
-    """
-    try:
-        p = run(["dig", "+short", "MX", name], stdout=PIPE, stderr=PIPE, text=True, timeout=3)
-        if p.returncode != 0:
-            return []
-        entries: List[Tuple[int, str]] = []
-        for line in (p.stdout or "").splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            parts = line.split()
-            if len(parts) < 2:
-                continue
-            try:
-                pref = int(parts[0])
-            except Exception:
-                continue
-            host = parts[1].rstrip(".").strip()
-            if host:
-                entries.append((pref, host))
-        entries.sort(key=lambda x: x[0])
-        return [h for _, h in entries]
-    except Exception:
-        return []
-
 
 def _resolve_all_ips(host: str, port: int) -> List[str]:
     ips: List[str] = []
@@ -826,23 +796,10 @@ def _resolve_all_ips(host: str, port: int) -> List[str]:
     return ips
 
 
-def _is_literal_ip(s: str) -> bool:
-    try:
-        socket.inet_pton(socket.AF_INET, s)
-        return True
-    except Exception:
-        pass
-    try:
-        socket.inet_pton(socket.AF_INET6, s)
-        return True
-    except Exception:
-        return False
-
-
-def _smtp_try_host_list(
+def _smtp_try_ips(
     message: EmailMessage,
-    host_label: str,
-    hosts: List[str],
+    fqdn: str,
+    ips: List[str],
     port: int,
     use_ssl: bool,
     use_tls: bool,
@@ -854,78 +811,50 @@ def _smtp_try_host_list(
     context = ssl.create_default_context()
     last_err: Optional[Exception] = None
 
-    for host in hosts:
-        host = str(host or "").strip()
-        if not host:
-            continue
-
+    for ip in ips:
         try:
-            if _is_literal_ip(host):
-                ips = [host]
+            log(f"SMTP_TRY fqdn={fqdn} ip={ip}:{port} ssl={use_ssl} starttls={use_tls} auth={use_auth}")
+
+            if use_ssl:
+                with smtplib.SMTP_SSL(ip, port, timeout=timeout, context=context) as srv:
+                    try:
+                        srv.ehlo()
+                    except Exception:
+                        pass
+                    if use_auth:
+                        srv.login(username, password)
+                    srv.send_message(message)
+                    log(f"SMTP_OK fqdn={fqdn} ip={ip}:{port}")
+                    return True
             else:
-                ips = _resolve_all_ips(host, port)
-
-            if not ips:
-                log_error(f"SMTP_DNS_NO_IPS label={host_label} host={host}")
-                continue
-
-            for ip in ips:
-                try:
-                    log(f"SMTP_TRY label={host_label} host={host} ip={ip}:{port} ssl={use_ssl} starttls={use_tls} auth={use_auth}")
-
-                    if use_ssl:
-                        with smtplib.SMTP_SSL(ip, port, timeout=timeout, context=context) as srv:
-                            try:
-                                srv.ehlo()
-                            except Exception:
-                                pass
-                            if use_auth:
-                                srv.login(username, password)
-                            srv.send_message(message)
-                            log(f"SMTP_OK label={host_label} ip={ip}:{port}")
-                            return True
-                    else:
-                        with smtplib.SMTP(ip, port, timeout=timeout) as srv:
-                            try:
-                                srv.ehlo()
-                            except Exception:
-                                pass
-                            if use_tls:
-                                srv.starttls(context=context)
-                                try:
-                                    srv.ehlo()
-                                except Exception:
-                                    pass
-                            if use_auth:
-                                srv.login(username, password)
-                            srv.send_message(message)
-                            log(f"SMTP_OK label={host_label} ip={ip}:{port}")
-                            return True
-
-                except Exception as e:
-                    last_err = e
-                    log_error(f"SMTP_TRY_FAIL label={host_label} host={host} ip={ip}:{port} err={e}")
-                    continue
+                with smtplib.SMTP(ip, port, timeout=timeout) as srv:
+                    try:
+                        srv.ehlo()
+                    except Exception:
+                        pass
+                    if use_tls:
+                        srv.starttls(context=context)
+                        try:
+                            srv.ehlo()
+                        except Exception:
+                            pass
+                    if use_auth:
+                        srv.login(username, password)
+                    srv.send_message(message)
+                    log(f"SMTP_OK fqdn={fqdn} ip={ip}:{port}")
+                    return True
 
         except Exception as e:
             last_err = e
-            log_error(f"SMTP_HOST_FAIL label={host_label} host={host} err={e}")
+            log_error(f"SMTP_TRY_FAIL fqdn={fqdn} ip={ip}:{port} err={e}")
             continue
 
     if last_err:
-        log_error(f"SMTP_FAIL label={host_label} err={last_err}")
+        log_error(f"SMTP_FAIL fqdn={fqdn} err={last_err}")
     return False
 
 
 def send_email(message: EmailMessage, server_settings: dict) -> None:
-    """
-    v2.6 Verhalten:
-    - SMTP ist ein einzelner Haupt-FQDN (wie bisher)
-    - optional: mx_first (Default True)
-    - optional: timeout_sec (Default 8)
-    - Wenn mx_first true: zuerst MX(smtp_host) probieren
-    - Danach immer Fallback auf A/AAAA des Haupt-FQDN, mit Failover ueber alle IPs
-    """
     try:
         smtp_host = str(server_settings.get('SMTP', 'localhost') or '').strip()
         smtp_port = int(server_settings.get('port', 25))
@@ -934,9 +863,7 @@ def send_email(message: EmailMessage, server_settings: dict) -> None:
         use_auth = bool(server_settings.get('smtpauth'))
         username = server_settings.get('username', '')
         password = server_settings.get('password', '')
-
         timeout = int(server_settings.get('timeout_sec', 8))
-        mx_first = bool(server_settings.get('mx_first', False))
 
         if not smtp_host:
             log_error("SMTP_FAIL reason=empty_smtp_host")
@@ -946,30 +873,20 @@ def send_email(message: EmailMessage, server_settings: dict) -> None:
             log_error("CONFIG_WARN ssl=true und starttls=true gleichzeitig, nehme SSL")
             use_tls = False
 
-        if mx_first:
-            mx_hosts = _resolve_mx_hosts_via_dig(smtp_host)
-            if mx_hosts:
-                ok = _smtp_try_host_list(
-                    message,
-                    f"mx_first:{smtp_host}",
-                    mx_hosts,
-                    smtp_port,
-                    use_ssl,
-                    use_tls,
-                    use_auth,
-                    username,
-                    password,
-                    timeout
-                )
-                if ok:
-                    return
-            else:
-                log(f"SMTP_MX_NONE host={smtp_host} fallback=A")
+        try:
+            ips = _resolve_all_ips(smtp_host, smtp_port)
+        except Exception as e:
+            log_error(f"SMTP_DNS_FAIL host={smtp_host} port={smtp_port} err={e}")
+            return
 
-        ok = _smtp_try_host_list(
+        if not ips:
+            log_error(f"SMTP_DNS_NO_IPS host={smtp_host} port={smtp_port}")
+            return
+
+        ok = _smtp_try_ips(
             message,
-            f"a_fallback:{smtp_host}",
-            [smtp_host],
+            smtp_host,
+            ips,
             smtp_port,
             use_ssl,
             use_tls,
