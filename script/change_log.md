@@ -16,12 +16,10 @@ Dieses Skript ist ein professioneller Mail-Filter für Postfix. Es liest E-Mails
 
 
 ### [v2.6.0] - 2026-02-18
-**SMTP-Failover mit MX-Lookup**
-- **MX-Lookup:** Optionaler MX-Lookup via `dig` vor direkter SMTP-Verbindung (`mx_first`, Default `true`).
-- **Failover:** Automatischer Failover über alle MX-Einträge sortiert nach Preference (niedrigste Priorität zuerst).
-- **IP-Failover:** Bei jedem Host werden alle A/AAAA-Records durchprobiert – kein Single-Point-of-Failure.
-- **Neue Config-Parameter:** `mx_first` und `timeout_sec` (Default `8`) in `autoreply_server.json`.
-- **Voraussetzung:** `dig` muss auf dem System installiert sein (`apt install dnsutils`).
+**SMTP-Failover über alle A/AAAA-Records**
+- **IP-Failover:** Der SMTP-FQDN wird vollständig aufgelöst (A und AAAA), alle IPs werden nacheinander probiert – kein Single-Point-of-Failure.
+- **Keine externe Abhängigkeit:** Kein `dig` nötig, Auflösung über Python `socket.getaddrinfo`.
+- **Neuer Config-Parameter:** `timeout_sec` (Default `8`) in `autoreply_server.json`.
 
 ### [v2.5.0] 
 **Stabilität und Robustheit**
