@@ -16,7 +16,7 @@ Dieses Skript ist ein professioneller Mail-Filter für Postfix. Es liest E-Mails
 
 ### [v2.5.0] 
 **Stabilität und Robustheit**
-- **stdin-Handling:** Explizites Schließen von stdin bei zu großen Nachrichten, damit Postfix sauber EOF erkennt.
+- **stdin-Handling:** Explizites Schließen von stdin bei zu grossen Nachrichten, damit Postfix sauber EOF erkennt.
 - **Typ-Annotationen:** `Pattern[str]` statt bare `Pattern` für Python 3.6 Kompatibilität.
 - **Mindestargument-Dokumentation:** Klarere Aufruf-Dokumentation im Help-Text.
 
