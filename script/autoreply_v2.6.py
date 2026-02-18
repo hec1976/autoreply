@@ -936,7 +936,7 @@ def send_email(message: EmailMessage, server_settings: dict) -> None:
         password = server_settings.get('password', '')
 
         timeout = int(server_settings.get('timeout_sec', 8))
-        mx_first = bool(server_settings.get('mx_first', True))
+        mx_first = bool(server_settings.get('mx_first', False))
 
         if not smtp_host:
             log_error("SMTP_FAIL reason=empty_smtp_host")
